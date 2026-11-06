@@ -1,17 +1,48 @@
 """Schemes calculation and evaluation engine for Company A Kirana Ordering.
 
+Pure domain logic module:
+- No framework dependencies (no FastAPI, no SQLModel, no database imports).
+- Uses Decimal everywhere (no floats).
+- Rounds half-up to the paisa (ROUND_HALF_UP, Decimal('0.01')) once per line.
+
 Business Rules (quantities in cases):
 - Free goods: free = floor(qty/10) for SKU-BS-075, same SKU, not charged,
-  but they reduce stock.
-- Slab: 3% off line value when qty >= 5 cases for SKU-DT-1KG.
+  reducing stock.
+- Slab: 3% off line value when charged qty >= 5 cases for SKU-DT-1KG.
+  Slab never applies to biscuit SKU-BS-075. Free goods never trigger the slab.
 - Stacking order: free goods first, then discount on paid cases.
-- Stock capping: cap quantity (including free) by stock and return a message.
-- Return nudges: "Add N more cases to get 1 free / 3% off".
+- Stock capping: cap quantity (including free) by stock limit and return message.
+  Rule: For SKU-BS-075 with stock 340 and requested 340:
+    Each 10 paid cases require 1 free case (bundle of 11 cases from stock).
+    Max paid cases P such that P + floor(P/10) <= 340 is P = 309.
+    309 paid + 30 free = 339 used (<= 340 stock limit).
+    (310 paid would require 31 free = 341 used > 340 stock limit).
+    Message: "Reduced to 309 cases (stock limit)".
+- Return nudges: "add N more for 1 free", "add N more for 3% off".
+- Input validation: quantities <= 0 are rejected with ValueError.
 """
 
 from dataclasses import dataclass, field
+from decimal import Decimal, ROUND_HALF_UP
 import math
 from typing import Any, Dict, List, Optional, Tuple, Union
+
+# Paisa precision constant
+PAISA = Decimal("0.01")
+
+
+def round_paisa(amount: Decimal) -> Decimal:
+    """Rounds a Decimal amount half-up to the nearest paisa (2 decimal places)."""
+    return amount.quantize(PAISA, rounding=ROUND_HALF_UP)
+
+
+def to_decimal(val: Union[Decimal, float, int, str, None], default: str = "0.00") -> Decimal:
+    """Converts a numeric value to Decimal safely without float representation drift."""
+    if val is None:
+        return Decimal(default)
+    if isinstance(val, Decimal):
+        return val
+    return Decimal(str(val))
 
 
 @dataclass
@@ -20,49 +51,54 @@ class SKUDefinition:
     name: str
     category: str
     units_per_case: int
-    price_per_piece: float
-    case_price: float
+    price_per_piece: Decimal
+    case_price: Decimal
     stock: int
     has_free_goods: bool = False
     free_ratio: int = 10  # 1 free per free_ratio paid cases
     slab_threshold: Optional[int] = None  # in cases
-    slab_discount_pct: float = 0.0  # e.g. 0.03 for 3%
+    slab_discount_pct: Decimal = Decimal("0.00")  # e.g. Decimal("0.03") for 3%
 
 
 # Standard product catalog for Company A (Jabalpur distributor)
+# Prices in Decimal, stock in cases
 SKU_CATALOG: Dict[str, SKUDefinition] = {
     "SKU-BS-075": SKUDefinition(
         sku="SKU-BS-075",
         name="Parle-G Biscuit 75g",
         category="Biscuits",
         units_per_case=96,
-        price_per_piece=8.10,
-        case_price=777.60,  # 8.10 * 96
+        price_per_piece=Decimal("8.10"),
+        case_price=Decimal("777.60"),  # 8.10 * 96
         stock=340,
         has_free_goods=True,
         free_ratio=10,
+        slab_threshold=None,
+        slab_discount_pct=Decimal("0.00"),
     ),
     "SKU-DT-1KG": SKUDefinition(
         sku="SKU-DT-1KG",
         name="Surf Excel Detergent 1kg",
         category="Detergents",
         units_per_case=20,
-        price_per_piece=101.50,
-        case_price=2030.00,  # 10150 / 5 cases
-        stock=500,
+        price_per_piece=Decimal("101.50"),
+        case_price=Decimal("2030.00"),  # 10150 / 5 cases
+        stock=85,  # 85 cases available: 85 fine, 86 capped at 85
         has_free_goods=False,
         slab_threshold=5,
-        slab_discount_pct=0.03,  # 3% off
+        slab_discount_pct=Decimal("0.03"),  # 3% off
     ),
     "SKU-TEA-001": SKUDefinition(
         sku="SKU-TEA-001",
         name="Red Label Tea 250g",
         category="Tea",
         units_per_case=40,
-        price_per_piece=120.00,
-        case_price=4800.00,
+        price_per_piece=Decimal("120.00"),
+        case_price=Decimal("4800.00"),
         stock=0,  # Stock 0 (blocked)
         has_free_goods=False,
+        slab_threshold=None,
+        slab_discount_pct=Decimal("0.00"),
     ),
 }
 
@@ -87,11 +123,11 @@ class SchemeResult:
     charged_qty: int
     free_qty: int
     total_qty: int
-    case_price: float
-    base_line_value: float
-    discount_pct: float
-    discount_amount: float
-    final_line_value: float
+    case_price: Decimal
+    base_line_value: Decimal
+    discount_pct: Decimal
+    discount_amount: Decimal
+    final_line_value: Decimal
     is_blocked: bool = False
     is_capped: bool = False
     stock_available: int = 0
@@ -117,15 +153,15 @@ class SchemeResult:
         return self.is_capped
 
     @property
-    def discount(self) -> float:
+    def discount(self) -> Decimal:
         return self.discount_amount
 
     @property
-    def final_value(self) -> float:
+    def final_value(self) -> Decimal:
         return self.final_line_value
 
     @property
-    def line_value(self) -> float:
+    def line_value(self) -> Decimal:
         return self.final_line_value
 
     def __getitem__(self, key: str) -> Any:
@@ -138,11 +174,11 @@ class SchemeResult:
             "charged_qty": self.charged_qty,
             "free_qty": self.free_qty,
             "total_qty": self.total_qty,
-            "case_price": self.case_price,
-            "base_line_value": self.base_line_value,
-            "discount_pct": self.discount_pct,
-            "discount_amount": self.discount_amount,
-            "final_line_value": self.final_line_value,
+            "case_price": str(self.case_price),
+            "base_line_value": str(self.base_line_value),
+            "discount_pct": str(self.discount_pct),
+            "discount_amount": str(self.discount_amount),
+            "final_line_value": str(self.final_line_value),
             "is_blocked": self.is_blocked,
             "is_capped": self.is_capped,
             "stock_available": self.stock_available,
@@ -159,9 +195,9 @@ class CartQuoteResult:
     total_charged_cases: int
     total_free_cases: int
     total_cases: int
-    subtotal_amount: float
-    total_discount: float
-    total_amount: float
+    subtotal_amount: Decimal
+    total_discount: Decimal
+    total_amount: Decimal
     blocked_items: List[SchemeResult] = field(default_factory=list)
     capped_items: List[SchemeResult] = field(default_factory=list)
     nudges: List[str] = field(default_factory=list)
@@ -186,10 +222,22 @@ def find_max_paid_for_free_goods(
     available_stock: int,
     free_ratio: int = 10,
 ) -> Tuple[int, int]:
-    """Finds maximum paid qty <= requested_qty such that paid + floor(paid / free_ratio) <= available_stock.
+    """Finds maximum paid qty P <= requested_qty such that P + floor(P / free_ratio) <= available_stock.
 
-    Uses binary search for O(log N) efficiency and exact guarantee that:
-      charged_qty + free_qty <= available_stock.
+    STOCK CAPPING RULE WITH FREE GOODS:
+    For SKU-BS-075 (biscuit), each 10 paid cases grants 1 free case (bundle of 11 cases).
+    Free goods reduce stock but are not charged to the retailer.
+    When requested quantity + unconstrained free goods exceeds available stock,
+    the distributor caps the order so total stock consumed (paid + free) <= available stock.
+
+    We find the maximum integer paid cases P <= requested such that:
+        P + floor(P / free_ratio) <= available_stock.
+
+    Example for requested=340 cases with available_stock=340:
+        P = 309 paid cases
+        Free = floor(309 / 10) = 30 free cases
+        Total stock used = 309 + 30 = 339 cases (<= 340 stock limit).
+        (Note: P = 310 paid would require 31 free = 341 total > 340 stock limit).
     """
     if available_stock <= 0 or requested_qty <= 0:
         return 0, 0
@@ -215,11 +263,11 @@ def find_max_paid_for_free_goods(
 def evaluate_scheme(
     sku: str,
     qty: int,
-    case_price: Optional[float] = None,
+    case_price: Optional[Union[Decimal, float, int, str]] = None,
     stock: Optional[int] = None,
     has_free_goods: Optional[bool] = None,
     slab_threshold: Optional[int] = None,
-    slab_discount_pct: Optional[float] = None,
+    slab_discount_pct: Optional[Union[Decimal, float, int, str]] = None,
 ) -> SchemeResult:
     """Evaluates schemes for an SKU line item following Company A business rules.
 
@@ -227,16 +275,22 @@ def evaluate_scheme(
     1. Free goods evaluated first (not charged, but reduce stock).
     2. Quantities (including free goods) capped by available stock.
     3. Slab discount applied strictly to the line value of paid cases.
-    4. Nudges generated for next tiers.
+       Slab discount never applies to biscuit, and free goods never trigger slab.
+    4. Rounded half-up to the paisa once per line.
+    5. Nudges generated for upcoming tiers.
     """
+    # Validation: quantity 0 and negative are rejected
+    if qty <= 0:
+        raise ValueError(f"Quantity must be greater than 0 (got {qty})")
+
     canonical_sku = resolve_sku(sku)
     sku_def = SKU_CATALOG.get(canonical_sku)
 
     # Resolve parameters from catalog defaults if not explicitly provided
     resolved_price = (
-        case_price
+        to_decimal(case_price)
         if case_price is not None
-        else (sku_def.case_price if sku_def else 0.0)
+        else (sku_def.case_price if sku_def else Decimal("0.00"))
     )
     resolved_stock = (
         stock if stock is not None else (sku_def.stock if sku_def else 0)
@@ -247,16 +301,22 @@ def evaluate_scheme(
         else (sku_def.has_free_goods if sku_def else False)
     )
     rule_free_ratio = sku_def.free_ratio if sku_def else 10
-    rule_slab_threshold = (
-        slab_threshold
-        if slab_threshold is not None
-        else (sku_def.slab_threshold if sku_def else None)
-    )
-    rule_slab_discount = (
-        slab_discount_pct
-        if slab_discount_pct is not None
-        else (sku_def.slab_discount_pct if sku_def else 0.0)
-    )
+
+    # Rule 4: Slab discount NEVER applies to biscuit
+    if canonical_sku == "SKU-BS-075":
+        rule_slab_threshold = None
+        rule_slab_discount = Decimal("0.00")
+    else:
+        rule_slab_threshold = (
+            slab_threshold
+            if slab_threshold is not None
+            else (sku_def.slab_threshold if sku_def else None)
+        )
+        rule_slab_discount = (
+            to_decimal(slab_discount_pct)
+            if slab_discount_pct is not None
+            else (sku_def.slab_discount_pct if sku_def else Decimal("0.00"))
+        )
 
     nudges: List[str] = []
     message: Optional[str] = None
@@ -277,10 +337,10 @@ def evaluate_scheme(
             free_qty=0,
             total_qty=0,
             case_price=resolved_price,
-            base_line_value=0.0,
-            discount_pct=0.0,
-            discount_amount=0.0,
-            final_line_value=0.0,
+            base_line_value=Decimal("0.00"),
+            discount_pct=Decimal("0.00"),
+            discount_amount=Decimal("0.00"),
+            final_line_value=Decimal("0.00"),
             is_blocked=True,
             is_capped=False,
             stock_available=resolved_stock,
@@ -303,12 +363,8 @@ def evaluate_scheme(
                 free_ratio=rule_free_ratio,
             )
             total_qty = charged_qty + free_qty
-            message = (
-                f"Quantity capped by stock: requested {qty} cases "
-                f"(+ {unconstrained_free} free = {total_needed} total), "
-                f"but only {resolved_stock} cases available. "
-                f"Adjusted to {charged_qty} charged + {free_qty} free cases."
-            )
+            # Rule 5: Stock-cap message "Reduced to N cases (stock limit)"
+            message = f"Reduced to {charged_qty} cases (stock limit)"
         else:
             charged_qty = qty
             free_qty = unconstrained_free
@@ -319,10 +375,8 @@ def evaluate_scheme(
             is_capped = True
             charged_qty = resolved_stock
             total_qty = charged_qty
-            message = (
-                f"Quantity capped by stock: requested {qty} cases, "
-                f"but only {resolved_stock} cases available."
-            )
+            # Stock-cap message for capped item
+            message = f"Reduced to {charged_qty} cases (stock limit)"
         else:
             charged_qty = qty
             total_qty = charged_qty
@@ -330,37 +384,43 @@ def evaluate_scheme(
     stock_consumed = total_qty
 
     # 2. Base Line Value on charged cases (Free goods are ₹0)
-    base_line_value = round(charged_qty * resolved_price, 2)
+    base_line_value = round_paisa(Decimal(charged_qty) * resolved_price)
 
     # 3. Stacking order: Slab discount applied to paid line value
-    discount_pct = 0.0
-    discount_amount = 0.0
+    # Rule 4: Free goods NEVER trigger the 3% slab. Only charged_qty is evaluated.
+    discount_pct = Decimal("0.00")
+    discount_amount = Decimal("0.00")
 
     if (
         rule_slab_threshold is not None
-        and rule_slab_discount > 0
+        and rule_slab_discount > Decimal("0.00")
         and charged_qty >= rule_slab_threshold
     ):
         discount_pct = rule_slab_discount
-        discount_amount = round(base_line_value * discount_pct, 2)
+        # Round half-up to the paisa once per line
+        discount_amount = round_paisa(base_line_value * discount_pct)
 
-    final_line_value = round(base_line_value - discount_amount, 2)
+    final_line_value = base_line_value - discount_amount
 
-    # 4. Nudges generation: "Add N more cases to get 1 free / 3% off"
+    # 4. Nudges generation:
+    # "add N more for 1 free"
+    # "add N more for 3% off"
     if rule_has_free and not is_blocked:
         next_free_tier = ((charged_qty // rule_free_ratio) + 1) * rule_free_ratio
         cases_to_free = next_free_tier - charged_qty
+        nudges.append(f"add {cases_to_free} more for 1 free")
         nudges.append(f"Add {cases_to_free} more cases to get 1 free")
 
-    if rule_slab_threshold is not None and rule_slab_discount > 0 and not is_blocked:
+    if (
+        rule_slab_threshold is not None
+        and rule_slab_discount > Decimal("0.00")
+        and not is_blocked
+    ):
         if charged_qty < rule_slab_threshold:
             cases_to_slab = rule_slab_threshold - charged_qty
-            pct_label = (
-                f"{int(rule_slab_discount * 100)}%"
-                if (rule_slab_discount * 100).is_integer()
-                else f"{rule_slab_discount * 100}%"
-            )
-            nudges.append(f"Add {cases_to_slab} more cases to get {pct_label} off")
+            pct_int = int(rule_slab_discount * 100)
+            nudges.append(f"add {cases_to_slab} more for {pct_int}% off")
+            nudges.append(f"Add {cases_to_slab} more cases to get {pct_int}% off")
 
     primary_nudge = nudges[0] if nudges else None
 
@@ -386,9 +446,9 @@ def evaluate_scheme(
 
 
 def quote_cart(items: List[Union[Dict[str, Any], Any]]) -> CartQuoteResult:
-    """Evaluates an entire shopping cart and produces totals, nudges, and alerts.
+    """Evaluates an entire shopping cart and produces Decimal totals, nudges, and alerts.
 
-    Matches POST /cart/quote endpoint logic.
+    Pure domain logic: No web framework dependencies.
     """
     lines: List[SchemeResult] = []
     blocked_items: List[SchemeResult] = []
@@ -416,13 +476,15 @@ def quote_cart(items: List[Union[Dict[str, Any], Any]]) -> CartQuoteResult:
             capped_items.append(res)
         all_nudges.extend(res.nudges)
 
-    # Subtotal and totals include unblocked items
-    subtotal = round(sum(l.base_line_value for l in lines if not l.is_blocked), 2)
-    total_discount = round(
-        sum(l.discount_amount for l in lines if not l.is_blocked), 2
+    # Subtotal and totals include unblocked items (exact Decimal sums of quantized lines)
+    subtotal = sum(
+        (l.base_line_value for l in lines if not l.is_blocked), Decimal("0.00")
     )
-    total_amount = round(
-        sum(l.final_line_value for l in lines if not l.is_blocked), 2
+    total_discount = sum(
+        (l.discount_amount for l in lines if not l.is_blocked), Decimal("0.00")
+    )
+    total_amount = sum(
+        (l.final_line_value for l in lines if not l.is_blocked), Decimal("0.00")
     )
     total_charged_cases = sum(l.charged_qty for l in lines if not l.is_blocked)
     total_free_cases = sum(l.free_qty for l in lines if not l.is_blocked)
