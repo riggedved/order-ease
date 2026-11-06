@@ -131,6 +131,7 @@ class OrderResponse(BaseModel):
     client_request_id: Optional[str] = None
     override_flag: bool = False
     override_reason: Optional[str] = None
+    exported_at: Optional[datetime] = None
     lines: List[OrderLineResponse] = Field(default_factory=list)
 
 
@@ -168,6 +169,7 @@ class DeskOrderDetail(BaseModel):
     client_request_id: Optional[str] = None
     override_flag: bool = False
     override_reason: Optional[str] = None
+    exported_at: Optional[datetime] = None
     lines: List[OrderLineResponse] = Field(default_factory=list)
     credit_position: CreditPositionResponse
 

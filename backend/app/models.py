@@ -102,6 +102,7 @@ class Order(SQLModel, table=True):
     client_request_id: Optional[str] = Field(default=None, index=True, nullable=True)
     override_flag: bool = Field(default=False)
     override_reason: Optional[str] = Field(default=None, nullable=True)
+    exported_at: Optional[datetime] = Field(default=None, nullable=True)
 
     # Relationships
     retailer: Optional[Retailer] = Relationship(back_populates="orders")

@@ -1,12 +1,15 @@
 """FastAPI application entrypoint with authentication, schemes, and order lifecycle management."""
 
+import csv
+import io
+import xml.etree.ElementTree as ET
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timezone
 from decimal import Decimal
 import json
 from typing import Any, List, Optional
 from pydantic import BaseModel
-from fastapi import FastAPI, Depends, HTTPException, Query, status
+from fastapi import FastAPI, Depends, HTTPException, Query, Response, status
 from sqlmodel import Session, select
 
 from backend.app.db import get_session, init_db
@@ -894,3 +897,208 @@ def patch_desk_order(
     return get_desk_order_detail(
         order_id=order.id, current_user=current_user, session=session
     )
+
+
+@app.get("/desk/export/tally")
+def export_tally(
+    format: str = Query("xml", description="Export format: xml or csv"),
+    include_exported: bool = Query(False, description="Whether to include orders already exported"),
+    from_date: Optional[date] = Query(None, description="Start date filter (inclusive)"),
+    to_date: Optional[date] = Query(None, description="End date filter (inclusive)"),
+    current_user: User = Depends(require_role([Role.ORDER_DESK, Role.OWNER])),
+    session: Session = Depends(get_session),
+):
+    """Exports approved orders in Tally XML or CSV format.
+
+    Accessible to order_desk and owner only.
+    """
+    fmt = format.lower().strip()
+    if fmt not in ("xml", "csv"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid format. Supported formats are 'xml' and 'csv'.",
+        )
+
+    query = select(Order).where(Order.status == OrderStatus.APPROVED)
+
+    if not include_exported:
+        query = query.where(Order.exported_at == None)
+
+    if from_date:
+        from_dt = datetime.combine(from_date, time.min).replace(tzinfo=timezone.utc)
+        query = query.where(Order.created_at >= from_dt)
+
+    if to_date:
+        to_dt = datetime.combine(to_date, time.max).replace(tzinfo=timezone.utc)
+        query = query.where(Order.created_at <= to_dt)
+
+    orders = session.exec(query.order_by(Order.id.asc())).all()
+
+    all_skus = {s.code: s for s in session.exec(select(SKU)).all()}
+    all_retailers = {r.id: r for r in session.exec(select(Retailer)).all()}
+
+    now = datetime.now(timezone.utc)
+
+    if fmt == "xml":
+        root = ET.Element("ENVELOPE")
+        header = ET.SubElement(root, "HEADER")
+        tally_req = ET.SubElement(header, "TALLYREQUEST")
+        tally_req.text = "Import Data"
+
+        body = ET.SubElement(root, "BODY")
+        import_data = ET.SubElement(body, "IMPORTDATA")
+
+        request_desc = ET.SubElement(import_data, "REQUESTDESC")
+        report_name = ET.SubElement(request_desc, "REPORTNAME")
+        report_name.text = "Vouchers"
+        static_vars = ET.SubElement(request_desc, "STATICVARIABLES")
+        sv_curr_company = ET.SubElement(static_vars, "SVCURRENTCOMPANY")
+        sv_curr_company.text = "Company A"
+
+        request_data = ET.SubElement(import_data, "REQUESTDATA")
+
+        for order in orders:
+            retailer = all_retailers.get(order.retailer_id)
+            retailer_name = retailer.name if retailer else f"Retailer {order.retailer_id}"
+
+            tally_msg = ET.SubElement(request_data, "TALLYMESSAGE")
+            tally_msg.set("xmlns:UDF", "TallyUDF")
+
+            voucher = ET.SubElement(tally_msg, "VOUCHER")
+            voucher.set("VCHTYPE", "Sales Order")
+            voucher.set("ACTION", "Create")
+
+            date_elem = ET.SubElement(voucher, "DATE")
+            date_elem.text = order.created_at.strftime("%Y%m%d")
+
+            vtype_elem = ET.SubElement(voucher, "VOUCHERTYPENAME")
+            vtype_elem.text = "Sales Order"
+
+            vnum_elem = ET.SubElement(voucher, "VOUCHERNUMBER")
+            vnum_elem.text = str(order.id)
+
+            party_elem = ET.SubElement(voucher, "PARTYLEDGERNAME")
+            party_elem.text = retailer_name
+
+            source_val = order.source.value if hasattr(order.source, "value") else str(order.source)
+            narr_elem = ET.SubElement(voucher, "NARRATION")
+            narr_elem.text = f"Order #{order.id} source: {source_val}"
+
+            vtotal_elem = ET.SubElement(voucher, "VOUCHERTOTAL")
+            vtotal_elem.text = f"{order.total:.2f}"
+
+            lines = session.exec(
+                select(OrderLine).where(OrderLine.order_id == order.id).order_by(OrderLine.id.asc())
+            ).all()
+
+            for line in lines:
+                sku = all_skus.get(line.sku_code)
+                sku_name = sku.name if sku else line.sku_code
+
+                # Charged inventory entry
+                if line.charged_cases > 0:
+                    inv = ET.SubElement(voucher, "ALLINVENTORYENTRIES.LIST")
+                    sname = ET.SubElement(inv, "STOCKITEMNAME")
+                    sname.text = sku_name
+
+                    rate = ET.SubElement(inv, "RATE")
+                    rate.text = f"{line.price_per_case:.2f}"
+
+                    billed = ET.SubElement(inv, "BILLEDQTY")
+                    billed.text = str(line.charged_cases)
+
+                    actual = ET.SubElement(inv, "ACTUALQTY")
+                    actual.text = str(line.charged_cases)
+
+                    amount = ET.SubElement(inv, "AMOUNT")
+                    amount.text = f"{line.line_total:.2f}"
+
+                # Free goods separate inventory entry with rate 0 and amount 0
+                if line.free_cases > 0:
+                    free_inv = ET.SubElement(voucher, "ALLINVENTORYENTRIES.LIST")
+                    fsname = ET.SubElement(free_inv, "STOCKITEMNAME")
+                    fsname.text = sku_name
+
+                    frate = ET.SubElement(free_inv, "RATE")
+                    frate.text = "0.00"
+
+                    fbilled = ET.SubElement(free_inv, "BILLEDQTY")
+                    fbilled.text = "0"
+
+                    factual = ET.SubElement(free_inv, "ACTUALQTY")
+                    factual.text = str(line.free_cases)
+
+                    famount = ET.SubElement(free_inv, "AMOUNT")
+                    famount.text = "0.00"
+
+        xml_raw = ET.tostring(root, encoding="utf-8").decode("utf-8")
+        output_content = f"<!-- MOCK export, not validated against a real Tally. -->\n{xml_raw}"
+    else:
+        output = io.StringIO()
+        writer = csv.writer(output)
+
+        writer.writerow([
+            "order_id",
+            "date",
+            "retailer",
+            "sku_code",
+            "sku_name",
+            "qty_cases",
+            "free_cases",
+            "rate_per_case",
+            "discount",
+            "line_total",
+            "gst_rate",
+            "order_total",
+            "source",
+            "override_reason",
+        ])
+
+        for order in orders:
+            retailer = all_retailers.get(order.retailer_id)
+            retailer_name = retailer.name if retailer else f"Retailer {order.retailer_id}"
+            order_date = order.created_at.strftime("%Y-%m-%d")
+            source_val = order.source.value if hasattr(order.source, "value") else str(order.source)
+            override_reason = order.override_reason or ""
+
+            lines = session.exec(
+                select(OrderLine).where(OrderLine.order_id == order.id).order_by(OrderLine.id.asc())
+            ).all()
+
+            for line in lines:
+                sku = all_skus.get(line.sku_code)
+                sku_name = sku.name if sku else line.sku_code
+                gst_rate = f"{sku.gst_rate:.2f}" if sku else "0.00"
+
+                writer.writerow([
+                    order.id,
+                    order_date,
+                    retailer_name,
+                    line.sku_code,
+                    sku_name,
+                    line.qty_cases,
+                    line.free_cases,
+                    f"{line.price_per_case:.2f}",
+                    f"{line.discount_amount:.2f}",
+                    f"{line.line_total:.2f}",
+                    gst_rate,
+                    f"{order.total:.2f}",
+                    source_val,
+                    override_reason,
+                ])
+
+        output_content = output.getvalue()
+
+    # After a successful export, set exported_at
+    for order in orders:
+        order.exported_at = now
+    session.commit()
+
+    dated_filename = f"tally_orders_{now.strftime('%Y%m%d_%H%M%S')}.{fmt}"
+    headers = {
+        "Content-Disposition": f'attachment; filename="{dated_filename}"',
+        "X-Tally-Export-Warning": "MOCK export, not validated against a real Tally.",
+    }
+    media_type = "application/xml" if fmt == "xml" else "text/csv"
+
+    return Response(content=output_content, media_type=media_type, headers=headers)

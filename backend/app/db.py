@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 import json
 from typing import Generator
-from sqlmodel import SQLModel, Session, create_engine, select
+from sqlmodel import SQLModel, Session, create_engine, select, text
 
 from backend.app.models import (
     SKU,
@@ -35,6 +35,16 @@ def get_session() -> Generator[Session, None, None]:
 def init_db(engine_to_use=engine) -> None:
     """Creates tables and seeds default data if tables are empty."""
     SQLModel.metadata.create_all(engine_to_use)
+    # Ensure newly added columns exist in existing SQLite DBs
+    with engine_to_use.connect() as conn:
+        try:
+            res = conn.execute(text("PRAGMA table_info(orders)")).fetchall()
+            cols = [r[1] for r in res]
+            if "exported_at" not in cols:
+                conn.execute(text("ALTER TABLE orders ADD COLUMN exported_at TIMESTAMP"))
+                conn.commit()
+        except Exception:
+            pass
     with Session(engine_to_use) as session:
         seed_data_if_empty(session)
 
