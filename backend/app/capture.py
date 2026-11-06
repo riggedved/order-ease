@@ -101,21 +101,71 @@ class RuleBasedParser:
         segments = [p.strip() for p in parts if p.strip()]
         return segments
 
+    @staticmethod
+    def _term_matches(term: str, text: str) -> bool:
+        """Robust boundary match supporting Latin and Indic/Devanagari text."""
+        pattern = rf"(?:^|\b|\d|[\s,.\-+!()\[\]/\\]){re.escape(term.lower())}(?:$|\b|\d|[\s,.\-+!()\[\]/\\])"
+        return bool(re.search(pattern, text, flags=re.IGNORECASE))
+
     def _extract_quantity(self, text: str) -> Optional[int]:
         """Extracts quantity from digits or Hindi number words (ek, do, teen...)."""
-        norm = self._normalize_digits(text)
+        norm = self._normalize_digits(text.lower())
 
-        # Check for standard digits first
-        digit_match = re.search(r"\b(\d+)\b", norm)
+        # 1. Look for quantity directly adjacent to any unit word
+        # (e.g. '5 peti', '1 peti', '५ पेटी', 'do peti', or 'peti 5')
+        all_unit_words = []
+        for words in self.unit_words.values():
+            all_unit_words.extend(words)
+        all_unit_words.sort(key=len, reverse=True)
+
+        nw_patterns = sorted(self.number_words.keys(), key=len, reverse=True)
+        num_or_word_pat = rf"(\d+|{'|'.join(re.escape(w) for w in nw_patterns)})"
+        unit_pat = rf"(?:{'|'.join(re.escape(u) for u in all_unit_words)})"
+
+        # Check: <num> <unit>
+        m_before = re.search(
+            rf"(?:^|[\s,.\-+!()\[\]/\\]){num_or_word_pat}\s*{unit_pat}(?:$|[\s,.\-+!()\[\]/\\])",
+            norm,
+            flags=re.IGNORECASE,
+        )
+        if m_before:
+            val = m_before.group(1).lower()
+            if val.isdigit():
+                return int(val)
+            if val in self.number_words:
+                return self.number_words[val]
+
+        # Check: <unit> <num>
+        m_after = re.search(
+            rf"(?:^|[\s,.\-+!()\[\]/\\]){unit_pat}\s*{num_or_word_pat}(?:$|[\s,.\-+!()\[\]/\\])",
+            norm,
+            flags=re.IGNORECASE,
+        )
+        if m_after:
+            val = m_after.group(1).lower()
+            if val.isdigit():
+                return int(val)
+            if val in self.number_words:
+                return self.number_words[val]
+
+        # 2. If no quantity adjacent to unit, mask out size hints so they aren't mistaken for quantities
+        size_mask_pat = (
+            r"(?:^|[\s,.\-+!()\[\]/\\])\d+\s*"
+            r"(?:wala|wale|wali|वाला|वाले|वाली|kilo|kg|k|gm|g|gram|ग्राम|किलो|ml|l|liter|लीटर|rupey|rs|rupee|रुपये|रु)"
+            r"(?:$|[\s,.\-+!()\[\]/\\])"
+        )
+        cleaned_text = re.sub(size_mask_pat, " ", norm, flags=re.IGNORECASE)
+
+        # Check standard digits
+        digit_match = re.search(r"\b(\d+)\b", cleaned_text)
         if digit_match:
             try:
                 return int(digit_match.group(1))
             except ValueError:
                 pass
 
-        # Check for Hindi number words
-        tokens = re.findall(r"\w+", norm.lower())
-        for token in tokens:
+        # Check Hindi number words
+        for token in re.findall(r"\w+", cleaned_text):
             if token in self.number_words:
                 return self.number_words[token]
 
@@ -124,18 +174,17 @@ class RuleBasedParser:
     def _extract_unit(self, text: str) -> str:
         """Extracts unit: case (peti/carton), piece (packet/pcs), or unknown."""
         norm = self._normalize_digits(text.lower())
-        tokens = re.findall(r"[^\s,]+", norm)
 
         # Check case words
         case_candidates = self.unit_words.get("case", [])
         for word in case_candidates:
-            if re.search(rf"\b{re.escape(word)}\b", norm):
+            if self._term_matches(word, norm):
                 return "case"
 
         # Check piece words
         piece_candidates = self.unit_words.get("piece", [])
         for word in piece_candidates:
-            if re.search(rf"\b{re.escape(word)}\b", norm):
+            if self._term_matches(word, norm):
                 return "piece"
 
         return "unknown"
@@ -218,7 +267,7 @@ class RuleBasedParser:
                 # Match longest category keyword
                 for cat_name, cat_data in self.categories.items():
                     for kw in cat_data.get("keywords", []):
-                        if re.search(rf"\b{re.escape(kw)}\b", norm_seg, flags=re.IGNORECASE):
+                        if self._term_matches(kw, norm_seg):
                             if len(kw) > matched_keyword_len:
                                 matched_keyword_len = len(kw)
                                 best_cat = (cat_name, cat_data)
@@ -231,9 +280,7 @@ class RuleBasedParser:
                     best_sku_code = None
                     for sku_code, sku_info in skus_dict.items():
                         for hint in sku_info.get("hints", []):
-                            # Hint check: word boundary or digit/unit combo
-                            hint_pattern = rf"\b{re.escape(hint)}\b"
-                            if re.search(hint_pattern, norm_seg, flags=re.IGNORECASE):
+                            if self._term_matches(hint, norm_seg):
                                 best_sku_code = sku_code
                                 break
                         if best_sku_code:

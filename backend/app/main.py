@@ -549,19 +549,6 @@ def create_order(
         override_reason=order.override_reason,
         lines=order_line_responses,
     )
-        id=order.id,
-        retailer_id=order.retailer_id,
-        retailer_name=retailer.name,
-        status=order.status,
-        source=order.source,
-        placed_by_user_id=order.placed_by_user_id,
-        created_at=order.created_at,
-        total=order.total,
-        client_request_id=order.client_request_id,
-        override_flag=order.override_flag,
-        override_reason=order.override_reason,
-        lines=order_line_responses,
-    )
 
 
 @app.get("/orders/mine", response_model=List[OrderResponse])
