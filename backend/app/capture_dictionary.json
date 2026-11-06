@@ -1,0 +1,118 @@
+{
+  "categories": {
+    "biscuits": {
+      "keywords": [
+        "biscuit",
+        "biskut",
+        "बिस्कुट",
+        "biskit",
+        "glucose biscuit",
+        "parle g"
+      ],
+      "default_sku": "SKU-BS-075",
+      "skus": {
+        "SKU-BS-075": {
+          "size": "small",
+          "hints": ["75", "75g", "75 g", "chhota", "chota", "छोटा", "chhoti", "5 wala", "5 rupey", "choti"],
+          "competes_with": ["SKU-BS-150"]
+        },
+        "SKU-BS-150": {
+          "size": "large",
+          "hints": ["150", "150g", "150 g", "bada", "बड़ा", "badi", "10 wala"],
+          "competes_with": ["SKU-BS-075"]
+        }
+      }
+    },
+    "detergents": {
+      "keywords": [
+        "washing powder",
+        "detergent",
+        "surf",
+        "कपड़े धोने का पाउडर",
+        "washing",
+        "detergent powder",
+        "powder"
+      ],
+      "default_sku": "SKU-DT-1KG",
+      "skus": {
+        "SKU-DT-1KG": {
+          "size": "large",
+          "hints": ["1kg", "1 kg", "1 kilo", "1kilo", "ek kilo", "1000g", "bada", "बड़ा", "badi"],
+          "competes_with": ["SKU-DT-500"]
+        },
+        "SKU-DT-500": {
+          "size": "small",
+          "hints": ["500", "500g", "500 gm", "aadha kilo", "chhota", "chota", "छोटा"],
+          "competes_with": ["SKU-DT-1KG"]
+        }
+      }
+    },
+    "tea": {
+      "keywords": [
+        "chai patti",
+        "chai",
+        "tea",
+        "चाय पत्ती",
+        "चाय",
+        "tea leaf",
+        "patti"
+      ],
+      "default_sku": "SKU-TE-250",
+      "skus": {
+        "SKU-TE-250": {
+          "size": "large",
+          "hints": ["250", "250g", "250 wala", "250 gram", "250gm", "bada", "पाव", "paav"],
+          "competes_with": ["SKU-TE-100"]
+        },
+        "SKU-TE-100": {
+          "size": "small",
+          "hints": ["100", "100g", "100 wala", "100 gram", "chhota", "chota", "छोटा"],
+          "competes_with": ["SKU-TE-250"]
+        }
+      }
+    }
+  },
+  "number_words": {
+    "ek": 1,
+    "एक": 1,
+    "do": 2,
+    "दो": 2,
+    "teen": 3,
+    "तीन": 3,
+    "char": 4,
+    "chaar": 4,
+    "चार": 4,
+    "paanch": 5,
+    "panch": 5,
+    "पाँच": 5,
+    "पांच": 5,
+    "chhah": 6,
+    "chhe": 6,
+    "छह": 6,
+    "saat": 7,
+    "सात": 7,
+    "aath": 8,
+    "आठ": 8,
+    "nau": 9,
+    "नौ": 9,
+    "das": 10,
+    "दस": 10
+  },
+  "devanagari_digits": {
+    "०": "0",
+    "१": "1",
+    "२": "2",
+    "३": "3",
+    "४": "4",
+    "५": "5",
+    "६": "6",
+    "७": "7",
+    "८": "8",
+    "९": "9"
+  },
+  "unit_words": {
+    "case": ["peti", "पेटी", "carton", "कार्टन", "case", "पेटीयां", "petiyan", "petiya"],
+    "piece": ["packet", "पैकेट", "piece", "पीस", "pcs", "dana", "दाना", "packets", "pieces"]
+  }
+}
+

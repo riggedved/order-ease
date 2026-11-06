@@ -120,6 +120,8 @@ class OrderLine(SQLModel, table=True):
     price_per_case: Decimal = Field(default=Decimal("0.00"), max_digits=10, decimal_places=2)
     discount_amount: Decimal = Field(default=Decimal("0.00"), max_digits=10, decimal_places=2)
     line_total: Decimal = Field(default=Decimal("0.00"), max_digits=12, decimal_places=2)
+    original_words: Optional[str] = Field(default=None, nullable=True)
+    unit: Optional[str] = Field(default="case", nullable=True)
 
     # Relationships
     order: Optional[Order] = Relationship(back_populates="lines")
@@ -135,4 +137,14 @@ class Alias(SQLModel, table=True):
 
     # Relationships
     retailer: Optional[Retailer] = Relationship(back_populates="aliases")
+
+
+class CaptureLog(SQLModel, table=True):
+    __tablename__ = "capture_logs"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    retailer_id: int = Field(foreign_key="retailers.id", index=True)
+    raw_text: str = Field(description="Raw message text captured")
+    parsed_json: str = Field(description="JSON serialized parsed lines and quote")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 

@@ -16,11 +16,14 @@ from backend.app.models import (
     Order,
     OrderLine,
     SKU,
+    Alias,
+    CaptureLog,
     Role,
     OrderStatus,
     OrderSource,
 )
 from backend.app.schemes import evaluate_scheme, round_paisa
+from backend.app.capture import get_parser
 from backend.app.auth import (
     MOCK_OTP,
     create_access_token,
@@ -32,15 +35,20 @@ from backend.app.schemas import (
     CatalogueSKUResponse,
     CartQuoteRequest,
     CartQuoteResponse,
+    CartQuoteLineRequest,
     CartQuoteLineResponse,
     OrderCreateRequest,
     OrderResponse,
     OrderLineResponse,
+    OrderLinePatchItem,
     DeskOrderSummary,
     DeskOrderDetail,
     CreditPositionResponse,
     OrderPatchRequest,
     RetailerSimpleResponse,
+    CaptureRequest,
+    CaptureResponse,
+    ParsedLineResponse,
 )
 
 
@@ -304,7 +312,7 @@ def get_catalogue(
 
 
 # ---------------------------------------------------------
-# Cart Quote Endpoint
+# Cart Quote & Capture Endpoints
 # ---------------------------------------------------------
 @app.post("/cart/quote", response_model=CartQuoteResponse)
 def get_cart_quote(
@@ -317,6 +325,77 @@ def get_cart_quote(
     return calculate_cart_quote(session, payload.lines)
 
 
+@app.post("/capture", response_model=CaptureResponse)
+def capture_order(
+    payload: CaptureRequest,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Parses vernacular voice/text message, generates quote preview, and saves capture log. Creates NO order."""
+    if current_user.role == Role.RETAILER:
+        if payload.retailer_id is not None and payload.retailer_id != current_user.retailer_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Forbidden: Retailer cannot capture for another retailer",
+            )
+        eff_retailer_id = current_user.retailer_id
+    else:
+        if not payload.retailer_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="retailer_id is required",
+            )
+        check_retailer_access(payload.retailer_id, current_user, session)
+        eff_retailer_id = payload.retailer_id
+
+    parser = get_parser()
+    capture_result = parser.parse(payload.text, eff_retailer_id, session)
+
+    # Build preview quote for quoteable lines (unit == 'case' and valid SKU)
+    quoteable = [
+        CartQuoteLineRequest(sku_code=l.sku_code, qty_cases=l.qty or 1)
+        for l in capture_result.lines
+        if l.sku_code and l.unit == "case" and (l.qty or 0) > 0
+    ]
+
+    preview_quote = None
+    if quoteable:
+        preview_quote = calculate_cart_quote(session, quoteable)
+
+    # Save only a capture log. Creates NO order.
+    log_entry = CaptureLog(
+        retailer_id=eff_retailer_id,
+        raw_text=payload.text,
+        parsed_json=json.dumps({
+            "lines": [l.to_dict() for l in capture_result.lines],
+            "preview_subtotal": str(preview_quote.subtotal) if preview_quote else "0.00",
+            "preview_payable": str(preview_quote.payable) if preview_quote else "0.00",
+        }),
+    )
+    session.add(log_entry)
+    session.commit()
+
+    parsed_responses = [
+        ParsedLineResponse(
+            original_words=l.original_words,
+            sku_code=l.sku_code,
+            qty=l.qty,
+            unit=l.unit,
+            confidence=l.confidence,
+            alternatives=l.alternatives,
+            flags=l.flags,
+        )
+        for l in capture_result.lines
+    ]
+
+    return CaptureResponse(
+        retailer_id=eff_retailer_id,
+        raw_text=payload.text,
+        lines=parsed_responses,
+        preview_quote=preview_quote,
+    )
+
+
 # ---------------------------------------------------------
 # Orders Endpoints
 # ---------------------------------------------------------
@@ -327,6 +406,21 @@ def create_order(
     session: Session = Depends(get_session),
 ):
     """Places an order with server-side re-quoting, idempotency, and credit checks."""
+    # Retailer-specific restrictions
+    if current_user.role == Role.RETAILER:
+        if payload.retailer_id != current_user.retailer_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Forbidden: Retailer cannot order for another retailer",
+            )
+        if payload.source == OrderSource.DESK_CAPTURE or (
+            payload.source and str(payload.source) == "desk_capture"
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Forbidden: Retailer cannot specify desk_capture as source",
+            )
+
     retailer = check_retailer_access(payload.retailer_id, current_user, session)
 
     # 1. Idempotency Check: Same client_request_id must never create a duplicate order
@@ -359,6 +453,8 @@ def create_order(
                     price_per_case=ol.price_per_case,
                     discount_amount=ol.discount_amount,
                     line_total=ol.line_total,
+                    original_words=ol.original_words,
+                    unit=ol.unit,
                 )
                 for ol in lines
             ],
@@ -399,9 +495,15 @@ def create_order(
     session.commit()
     session.refresh(order)
 
-    # 6. Persist Order Lines
+    # 6. Persist Order Lines carrying original_words and unit
+    req_meta = {
+        idx: (item.original_words, item.unit)
+        for idx, item in enumerate(payload.lines)
+    }
+
     order_line_responses: List[OrderLineResponse] = []
-    for ql in quote.lines:
+    for idx, ql in enumerate(quote.lines):
+        words, unit_val = req_meta.get(idx, (None, "case"))
         ol = OrderLine(
             order_id=order.id,
             sku_code=ql.sku_code,
@@ -411,6 +513,8 @@ def create_order(
             price_per_case=ql.case_price,
             discount_amount=ql.discount,
             line_total=ql.line_total,
+            original_words=words,
+            unit=unit_val or "case",
         )
         session.add(ol)
         session.commit()
@@ -426,10 +530,25 @@ def create_order(
                 price_per_case=ol.price_per_case,
                 discount_amount=ol.discount_amount,
                 line_total=ol.line_total,
+                original_words=ol.original_words,
+                unit=ol.unit,
             )
         )
 
     return OrderResponse(
+        id=order.id,
+        retailer_id=order.retailer_id,
+        retailer_name=retailer.name,
+        status=order.status,
+        source=order.source,
+        placed_by_user_id=order.placed_by_user_id,
+        created_at=order.created_at,
+        total=order.total,
+        client_request_id=order.client_request_id,
+        override_flag=order.override_flag,
+        override_reason=order.override_reason,
+        lines=order_line_responses,
+    )
         id=order.id,
         retailer_id=order.retailer_id,
         retailer_name=retailer.name,
@@ -647,17 +766,57 @@ def patch_desk_order(
 
     # 1. Edit line quantities if provided (re-quote on server)
     if payload.lines is not None:
-        quote = calculate_cart_quote(session, payload.lines)
-
-        # Clear old lines and replace with new ones
         old_lines = session.exec(
             select(OrderLine).where(OrderLine.order_id == order.id)
         ).all()
+        old_words_sku = {
+            ol.original_words.strip().lower(): ol.sku_code
+            for ol in old_lines
+            if ol.original_words
+        }
+        old_by_idx = {i: ol for i, ol in enumerate(old_lines)}
+
+        # Check for SKU changes on lines with original_words to save an Alias
+        for idx, pl in enumerate(payload.lines):
+            words = pl.original_words
+            if not words and idx in old_by_idx:
+                words = old_by_idx[idx].original_words
+
+            if words:
+                words_clean = words.strip().lower()
+                old_sku = old_words_sku.get(words_clean) or (
+                    old_by_idx[idx].sku_code if idx in old_by_idx else None
+                )
+                if old_sku and old_sku != pl.sku_code:
+                    # Desk changed the SKU: Save an Alias for this retailer
+                    existing_alias = session.exec(
+                        select(Alias).where(
+                            Alias.retailer_id == order.retailer_id,
+                            Alias.original_words == words_clean,
+                        )
+                    ).first()
+                    if existing_alias:
+                        existing_alias.sku_code = pl.sku_code
+                        session.add(existing_alias)
+                    else:
+                        new_alias = Alias(
+                            retailer_id=order.retailer_id,
+                            original_words=words_clean,
+                            sku_code=pl.sku_code,
+                        )
+                        session.add(new_alias)
+                    session.commit()
+
+        # Delete old lines and re-create updated lines
         for ol in old_lines:
             session.delete(ol)
         session.commit()
 
-        for ql in quote.lines:
+        quote = calculate_cart_quote(session, payload.lines)
+        for idx, ql in enumerate(quote.lines):
+            words = payload.lines[idx].original_words if idx < len(payload.lines) else None
+            if not words and idx in old_by_idx:
+                words = old_by_idx[idx].original_words
             ol = OrderLine(
                 order_id=order.id,
                 sku_code=ql.sku_code,
@@ -667,6 +826,8 @@ def patch_desk_order(
                 price_per_case=ql.case_price,
                 discount_amount=ql.discount,
                 line_total=ql.line_total,
+                original_words=words,
+                unit="case",
             )
             session.add(ol)
         order.total = quote.payable
@@ -697,15 +858,29 @@ def patch_desk_order(
             order.override_flag = True
             order.override_reason = payload.override_reason.strip()
 
-        # Stock reduction only occurs when the desk approves
+        # Approval re-checks stock including free cases and refuses if it would go negative
         if (
             target_status == OrderStatus.APPROVED
             and order.status != OrderStatus.APPROVED
         ):
-            # Reduce stock in SKU table for each line
             order_lines = session.exec(
                 select(OrderLine).where(OrderLine.order_id == order.id)
             ).all()
+
+            # Pre-check stock across all lines
+            for ol in order_lines:
+                sku = session.exec(
+                    select(SKU).where(SKU.code == ol.sku_code)
+                ).first()
+                if sku:
+                    needed = ol.charged_cases + ol.free_cases
+                    if sku.stock_cases < needed:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"Cannot approve order: insufficient stock for {sku.code} (needs {needed}, available {sku.stock_cases})",
+                        )
+
+            # Deduct stock after verification
             for ol in order_lines:
                 sku = session.exec(
                     select(SKU).where(SKU.code == ol.sku_code)

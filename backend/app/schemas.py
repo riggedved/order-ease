@@ -62,11 +62,43 @@ class CartQuoteResponse(BaseModel):
 
 
 # ---------------------------------------------------------
+# Capture Schemas
+# ---------------------------------------------------------
+class CaptureRequest(BaseModel):
+    retailer_id: Optional[int] = None
+    text: str
+
+
+class ParsedLineResponse(BaseModel):
+    original_words: str
+    sku_code: Optional[str] = None
+    qty: Optional[int] = None
+    unit: str = "unknown"
+    confidence: str = "low"
+    alternatives: List[str] = Field(default_factory=list)
+    flags: List[str] = Field(default_factory=list)
+
+
+class CaptureResponse(BaseModel):
+    retailer_id: int
+    raw_text: str
+    lines: List[ParsedLineResponse]
+    preview_quote: Optional[CartQuoteResponse] = None
+
+
+# ---------------------------------------------------------
 # Order Schemas
 # ---------------------------------------------------------
+class OrderLineCreateItem(BaseModel):
+    sku_code: str
+    qty_cases: int
+    original_words: Optional[str] = None
+    unit: Optional[str] = "case"
+
+
 class OrderCreateRequest(BaseModel):
     retailer_id: int
-    lines: List[CartQuoteLineRequest]
+    lines: List[OrderLineCreateItem]
     source: Optional[OrderSource] = None
     client_request_id: str
     # Malicious/client-provided totals to test server ignores them
@@ -83,6 +115,8 @@ class OrderLineResponse(BaseModel):
     price_per_case: Decimal
     discount_amount: Decimal
     line_total: Decimal
+    original_words: Optional[str] = None
+    unit: Optional[str] = "case"
 
 
 class OrderResponse(BaseModel):
@@ -138,9 +172,15 @@ class DeskOrderDetail(BaseModel):
     credit_position: CreditPositionResponse
 
 
+class OrderLinePatchItem(BaseModel):
+    sku_code: str
+    qty_cases: int
+    original_words: Optional[str] = None
+
+
 class OrderPatchRequest(BaseModel):
     status: Optional[OrderStatus] = None
-    lines: Optional[List[CartQuoteLineRequest]] = None
+    lines: Optional[List[OrderLinePatchItem]] = None
     override_flag: Optional[bool] = False
     override_reason: Optional[str] = None
 
