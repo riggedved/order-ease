@@ -99,6 +99,9 @@ class Order(SQLModel, table=True):
     placed_by_user_id: int = Field(foreign_key="users.id")
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     total: Decimal = Field(default=Decimal("0.00"), max_digits=12, decimal_places=2)
+    client_request_id: Optional[str] = Field(default=None, index=True, nullable=True)
+    override_flag: bool = Field(default=False)
+    override_reason: Optional[str] = Field(default=None, nullable=True)
 
     # Relationships
     retailer: Optional[Retailer] = Relationship(back_populates="orders")
