@@ -19,8 +19,9 @@ from backend.app.auth import (
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize SQLite database and seed initial data
-    init_db()
+    # Initialize SQLite database and seed initial data only when running production
+    if get_session not in app.dependency_overrides:
+        init_db()
     yield
 
 

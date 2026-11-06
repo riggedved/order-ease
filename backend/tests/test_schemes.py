@@ -81,7 +81,7 @@ class TestRequiredSchemes:
 
     def test_tea_1_case_blocked_stock_0(self):
         """tea 1 case -> blocked (stock 0)."""
-        result = evaluate_scheme("SKU-TEA-001", qty=1, stock=0)
+        result = evaluate_scheme("SKU-TE-250", qty=1, stock=0)
         assert result.is_blocked is True
         assert result.blocked is True
         assert result.charged_qty == 0
@@ -235,7 +235,7 @@ class TestPaisaRoundingAndDecimals:
         quote = quote_cart([
             {"sku": "SKU-BS-075", "qty": 10},
             {"sku": "SKU-DT-1KG", "qty": 5},
-            {"sku": "SKU-TEA-001", "qty": 1},
+            {"sku": "SKU-TE-250", "qty": 1},
         ])
         assert isinstance(quote.subtotal_amount, Decimal)
         assert isinstance(quote.total_discount, Decimal)

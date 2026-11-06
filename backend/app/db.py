@@ -1,5 +1,6 @@
 """Database connection, session management, and seed data initialization."""
 
+import os
 from datetime import datetime, timezone
 from decimal import Decimal
 import json
@@ -18,7 +19,7 @@ from backend.app.models import (
     OrderSource,
 )
 
-DATABASE_URL = "sqlite:///./orderease.db"
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./orderease.db")
 engine = create_engine(
     DATABASE_URL,
     connect_args={"check_same_thread": False},
@@ -44,12 +45,12 @@ def seed_data_if_empty(session: Session) -> None:
     if existing_sku:
         return
 
-    # 1. SKUs (3 Required + 3 Decoys)
+    # 1. SKUs (3 Required + 3 Decoys with generic names)
     skus = [
         # Required sample SKUs
         SKU(
             code="SKU-BS-075",
-            name="Parle-G Biscuit 75g",
+            name="Glucose biscuit 75 g, case of 96",
             price_per_piece=Decimal("8.10"),
             units_per_case=96,
             gst_rate=Decimal("0.05"),
@@ -61,7 +62,7 @@ def seed_data_if_empty(session: Session) -> None:
         ),
         SKU(
             code="SKU-DT-1KG",
-            name="Surf Excel Detergent 1kg",
+            name="Detergent powder 1 kg, case of 20",
             price_per_piece=Decimal("101.50"),
             units_per_case=20,
             gst_rate=Decimal("0.18"),
@@ -72,8 +73,8 @@ def seed_data_if_empty(session: Session) -> None:
             image_url="https://images.unsplash.com/photo-1583947215259-38e31be8751f?w=200",
         ),
         SKU(
-            code="SKU-TEA-250",
-            name="Red Label Tea 250g",
+            code="SKU-TE-250",
+            name="Tea leaf 250 g, case of 40",
             price_per_piece=Decimal("118.00"),
             units_per_case=40,
             gst_rate=Decimal("0.05"),
@@ -86,7 +87,7 @@ def seed_data_if_empty(session: Session) -> None:
         # Decoy SKUs
         SKU(
             code="SKU-BS-150",
-            name="Parle-G Biscuit 150g",
+            name="Glucose biscuit 150 g, case of 48",
             price_per_piece=Decimal("15.00"),
             units_per_case=48,
             gst_rate=Decimal("0.05"),
@@ -98,7 +99,7 @@ def seed_data_if_empty(session: Session) -> None:
         ),
         SKU(
             code="SKU-DT-500",
-            name="Surf Excel Detergent 500g",
+            name="Detergent powder 500 g, case of 40",
             price_per_piece=Decimal("55.00"),
             units_per_case=40,
             gst_rate=Decimal("0.18"),
@@ -109,8 +110,8 @@ def seed_data_if_empty(session: Session) -> None:
             image_url="https://images.unsplash.com/photo-1583947215259-38e31be8751f?w=200",
         ),
         SKU(
-            code="SKU-TEA-100",
-            name="Red Label Tea 100g",
+            code="SKU-TE-100",
+            name="Tea leaf 100 g, case of 80",
             price_per_piece=Decimal("50.00"),
             units_per_case=80,
             gst_rate=Decimal("0.05"),
@@ -256,17 +257,22 @@ def seed_data_if_empty(session: Session) -> None:
     )
     session.add(line_2)
 
-    # 6. Aliases
+    # 6. Generic Aliases
     alias_1 = Alias(
         retailer_id=retailer_1.id,
-        original_words="parle g 5 rupay",
+        original_words="glucose biscuit chota",
         sku_code="SKU-BS-075",
     )
     alias_2 = Alias(
         retailer_id=retailer_1.id,
-        original_words="surf bada packet",
+        original_words="detergent powder 1kg",
         sku_code="SKU-DT-1KG",
     )
-    session.add_all([alias_1, alias_2])
+    alias_3 = Alias(
+        retailer_id=retailer_1.id,
+        original_words="tea leaf 250g",
+        sku_code="SKU-TE-250",
+    )
+    session.add_all([alias_1, alias_2, alias_3])
     session.commit()
 

@@ -65,7 +65,7 @@ class SKUDefinition:
 SKU_CATALOG: Dict[str, SKUDefinition] = {
     "SKU-BS-075": SKUDefinition(
         sku="SKU-BS-075",
-        name="Parle-G Biscuit 75g",
+        name="Glucose biscuit 75 g, case of 96",
         category="Biscuits",
         units_per_case=96,
         price_per_piece=Decimal("8.10"),
@@ -78,7 +78,7 @@ SKU_CATALOG: Dict[str, SKUDefinition] = {
     ),
     "SKU-DT-1KG": SKUDefinition(
         sku="SKU-DT-1KG",
-        name="Surf Excel Detergent 1kg",
+        name="Detergent powder 1 kg, case of 20",
         category="Detergents",
         units_per_case=20,
         price_per_piece=Decimal("101.50"),
@@ -88,13 +88,13 @@ SKU_CATALOG: Dict[str, SKUDefinition] = {
         slab_threshold=5,
         slab_discount_pct=Decimal("0.03"),  # 3% off
     ),
-    "SKU-TEA-001": SKUDefinition(
-        sku="SKU-TEA-001",
-        name="Red Label Tea 250g",
+    "SKU-TE-250": SKUDefinition(
+        sku="SKU-TE-250",
+        name="Tea leaf 250 g, case of 40",
         category="Tea",
         units_per_case=40,
-        price_per_piece=Decimal("120.00"),
-        case_price=Decimal("4800.00"),
+        price_per_piece=Decimal("118.00"),
+        case_price=Decimal("4720.00"),  # 118 * 40
         stock=0,  # Stock 0 (blocked)
         has_free_goods=False,
         slab_threshold=None,
@@ -106,13 +106,17 @@ SKU_CATALOG: Dict[str, SKUDefinition] = {
 SKU_ALIASES: Dict[str, str] = {
     "biscuit": "SKU-BS-075",
     "biscuits": "SKU-BS-075",
-    "parle-g": "SKU-BS-075",
+    "glucose biscuit": "SKU-BS-075",
     "detergent": "SKU-DT-1KG",
-    "surf": "SKU-DT-1KG",
-    "tea": "SKU-TEA-001",
-    "red label": "SKU-TEA-001",
-    "sku-tea-250": "SKU-TEA-001",
-    "sku-tea": "SKU-TEA-001",
+    "detergent powder": "SKU-DT-1KG",
+    "tea": "SKU-TE-250",
+    "tea leaf": "SKU-TE-250",
+    "chai": "SKU-TE-250",
+    "chai patti": "SKU-TE-250",
+    "sku-te-250": "SKU-TE-250",
+    "sku-tea-250": "SKU-TE-250",
+    "sku-tea-001": "SKU-TE-250",
+    "sku-tea": "SKU-TE-250",
 }
 
 

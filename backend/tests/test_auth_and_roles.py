@@ -9,34 +9,8 @@ Required test cases:
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlmodel import Session, SQLModel, create_engine
-from sqlmodel.pool import StaticPool
 
-from backend.app.main import app
-from backend.app.db import get_session, seed_data_if_empty
 from backend.app.models import Role
-
-
-@pytest.fixture(name="client")
-def client_fixture():
-    # Use in-memory SQLite database for test isolation
-    engine = create_engine(
-        "sqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    SQLModel.metadata.create_all(engine)
-    with Session(engine) as session:
-        seed_data_if_empty(session)
-
-    def get_test_session():
-        with Session(engine) as session:
-            yield session
-
-    app.dependency_overrides[get_session] = get_test_session
-    client = TestClient(app)
-    yield client
-    app.dependency_overrides.clear()
 
 
 def login_as(client: TestClient, phone: str, otp: str = "123456") -> str:
@@ -164,4 +138,37 @@ class TestRoleBasedAccessControl:
 
         owner_ret4 = client.get("/retailers/4", headers=owner_headers)
         assert owner_ret4.status_code == 200
+
+
+class TestSeededDataAndTempDatabase:
+    """Verifies that seeded data uses generic names, SKU-TE-250, and temp database."""
+
+    def test_generic_sku_names_and_code(self, session):
+        """Verifies SKU-TE-250 and generic product naming in database."""
+        from sqlmodel import select
+        from backend.app.models import SKU, Alias
+
+        skus = {s.code: s for s in session.exec(select(SKU)).all()}
+        assert "SKU-TE-250" in skus
+        assert "SKU-TEA-250" not in skus
+
+        # Check required generic names
+        assert skus["SKU-BS-075"].name == "Glucose biscuit 75 g, case of 96"
+        assert skus["SKU-DT-1KG"].name == "Detergent powder 1 kg, case of 20"
+        assert skus["SKU-TE-250"].name == "Tea leaf 250 g, case of 40"
+
+        # Check decoy generic names
+        assert skus["SKU-BS-150"].name == "Glucose biscuit 150 g, case of 48"
+        assert skus["SKU-DT-500"].name == "Detergent powder 500 g, case of 40"
+        assert skus["SKU-TE-100"].name == "Tea leaf 100 g, case of 80"
+
+        # Check aliases
+        aliases = session.exec(select(Alias)).all()
+        alias_skus = {a.sku_code for a in aliases}
+        assert "SKU-TE-250" in alias_skus
+        alias_texts = {a.original_words for a in aliases}
+        assert "glucose biscuit chota" in alias_texts
+        assert "detergent powder 1kg" in alias_texts
+        assert "tea leaf 250g" in alias_texts
+
 
