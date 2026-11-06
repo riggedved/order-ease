@@ -1,0 +1,167 @@
+"""Unit tests for authentication, JWT issuance, and role-based access control.
+
+Required test cases:
+1. retailer A requesting retailer B's data -> 403
+2. retailer calling any /desk endpoint -> 403
+3. salesman requesting an unassigned retailer -> 403
+4. wrong OTP -> 401
+"""
+
+import pytest
+from fastapi.testclient import TestClient
+from sqlmodel import Session, SQLModel, create_engine
+from sqlmodel.pool import StaticPool
+
+from backend.app.main import app
+from backend.app.db import get_session, seed_data_if_empty
+from backend.app.models import Role
+
+
+@pytest.fixture(name="client")
+def client_fixture():
+    # Use in-memory SQLite database for test isolation
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    SQLModel.metadata.create_all(engine)
+    with Session(engine) as session:
+        seed_data_if_empty(session)
+
+    def get_test_session():
+        with Session(engine) as session:
+            yield session
+
+    app.dependency_overrides[get_session] = get_test_session
+    client = TestClient(app)
+    yield client
+    app.dependency_overrides.clear()
+
+
+def login_as(client: TestClient, phone: str, otp: str = "123456") -> str:
+    """Helper to authenticate and retrieve access token."""
+    response = client.post("/auth/otp", json={"phone": phone, "otp": otp})
+    assert response.status_code == 200
+    return response.json()["access_token"]
+
+
+class TestAuthAndOTP:
+    """Authentication and OTP verification tests."""
+
+    def test_wrong_otp_returns_401(self, client: TestClient):
+        """wrong OTP -> 401."""
+        response = client.post("/auth/otp", json={"phone": "9826011111", "otp": "999999"})
+        assert response.status_code == 401
+        assert "Invalid OTP" in response.json()["detail"]
+
+    def test_valid_otp_returns_jwt_with_user_id_and_role(self, client: TestClient):
+        """Valid OTP 123456 returns JWT with user_id and role."""
+        response = client.post("/auth/otp", json={"phone": "9826011111", "otp": "123456"})
+        assert response.status_code == 200
+        data = response.json()
+        assert "access_token" in data
+        assert data["token_type"] == "bearer"
+        assert data["role"] == Role.RETAILER.value
+        assert data["retailer_id"] == 1
+        assert data["user_id"] is not None
+
+    def test_unregistered_phone_returns_401(self, client: TestClient):
+        """Unregistered phone number with OTP 123456 returns 401."""
+        response = client.post("/auth/otp", json={"phone": "9999999999", "otp": "123456"})
+        assert response.status_code == 401
+
+    def test_missing_credentials_returns_401(self, client: TestClient):
+        """Accessing protected endpoint without token returns 401."""
+        response = client.get("/retailers/1")
+        assert response.status_code == 401
+
+
+class TestRoleBasedAccessControl:
+    """Role and store-level permission tests."""
+
+    def test_retailer_a_requesting_retailer_b_data_returns_403(self, client: TestClient):
+        """retailer A requesting retailer B's data -> 403.
+
+        Retailer 1 (phone: 9826011111) requests data for Retailer 2 (/retailers/2).
+        Must be forbidden with 403.
+        """
+        token_a = login_as(client, phone="9826011111")  # Retailer 1
+        headers = {"Authorization": f"Bearer {token_a}"}
+
+        # Requesting own store (Retailer 1) -> 200 OK
+        own_res = client.get("/retailers/1", headers=headers)
+        assert own_res.status_code == 200
+        assert own_res.json()["id"] == 1
+
+        # Requesting another store (Retailer 2) -> 403 Forbidden
+        other_res = client.get("/retailers/2", headers=headers)
+        assert other_res.status_code == 403
+        assert "Forbidden" in other_res.json()["detail"]
+
+    def test_retailer_calling_any_desk_endpoint_returns_403(self, client: TestClient):
+        """retailer calling any /desk endpoint -> 403."""
+        token_a = login_as(client, phone="9826011111")  # Retailer 1
+        headers = {"Authorization": f"Bearer {token_a}"}
+
+        # Calling /desk/orders
+        orders_res = client.get("/desk/orders", headers=headers)
+        assert orders_res.status_code == 403
+
+        # Calling /desk/retailers
+        retailers_res = client.get("/desk/retailers", headers=headers)
+        assert retailers_res.status_code == 403
+
+    def test_salesman_requesting_unassigned_retailer_returns_403(self, client: TestClient):
+        """salesman requesting an unassigned retailer -> 403.
+
+        Salesman Rahul (phone: 9826000002) is assigned to Retailer 1 and Retailer 2,
+        but NOT to Retailer 3 or Retailer 4.
+        """
+        salesman_token = login_as(client, phone="9826000002")  # Salesman
+        headers = {"Authorization": f"Bearer {salesman_token}"}
+
+        # Assigned store (Retailer 1) -> 200 OK
+        assigned_res = client.get("/retailers/1", headers=headers)
+        assert assigned_res.status_code == 200
+        assert assigned_res.json()["id"] == 1
+
+        # Assigned store (Retailer 2) -> 200 OK
+        assigned_res2 = client.get("/retailers/2", headers=headers)
+        assert assigned_res2.status_code == 200
+        assert assigned_res2.json()["id"] == 2
+
+        # Unassigned store (Retailer 3) -> 403 Forbidden
+        unassigned_res3 = client.get("/retailers/3", headers=headers)
+        assert unassigned_res3.status_code == 403
+        assert "Forbidden" in unassigned_res3.json()["detail"]
+
+        # Unassigned store (Retailer 4) -> 403 Forbidden
+        unassigned_res4 = client.get("/retailers/4", headers=headers)
+        assert unassigned_res4.status_code == 403
+        assert "Forbidden" in unassigned_res4.json()["detail"]
+
+    def test_order_desk_and_owner_access(self, client: TestClient):
+        """order_desk and owner can access /desk and any retailer."""
+        desk_token = login_as(client, phone="9826000001")  # Order Desk
+        desk_headers = {"Authorization": f"Bearer {desk_token}"}
+
+        # Desk can access /desk/orders
+        desk_orders = client.get("/desk/orders", headers=desk_headers)
+        assert desk_orders.status_code == 200
+        assert len(desk_orders.json()) >= 2
+
+        # Desk can access any retailer
+        desk_ret3 = client.get("/retailers/3", headers=desk_headers)
+        assert desk_ret3.status_code == 200
+
+        # Owner can access /desk/orders and any retailer
+        owner_token = login_as(client, phone="9826000003")  # Owner
+        owner_headers = {"Authorization": f"Bearer {owner_token}"}
+
+        owner_orders = client.get("/desk/orders", headers=owner_headers)
+        assert owner_orders.status_code == 200
+
+        owner_ret4 = client.get("/retailers/4", headers=owner_headers)
+        assert owner_ret4.status_code == 200
+
