@@ -1,7 +1,9 @@
 """Tests for the vernacular order capture engine, parsers, and endpoints."""
 
 from decimal import Decimal
+import json
 import os
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import select
@@ -86,13 +88,256 @@ class TestOrderCaptureParser:
         assert l.unit == "case"
         assert l.sku_code == "SKU-BS-075"
 
-    def test_llm_parser_stub(self, monkeypatch):
-        """LLMParser raises NotImplementedError when selected by env var."""
-        monkeypatch.setenv("ORDER_PARSER_MODE", "llm")
-        parser = get_parser()
-        assert isinstance(parser, LLMParser)
-        with pytest.raises(NotImplementedError):
-            parser.parse("biscuit", 1, None)
+def make_llm_mock(content_or_status, is_exception=False):
+    """Creates a mock post function for httpx.Client that only intercepts /chat/completions."""
+    original_post = httpx.Client.post
+
+    def mock_post(self, url, *args, **kwargs):
+        url_str = str(url)
+        if "/chat/completions" in url_str:
+            if is_exception:
+                raise content_or_status
+            if isinstance(content_or_status, int):
+                return httpx.Response(
+                    status_code=content_or_status,
+                    request=httpx.Request("POST", url_str),
+                )
+            return httpx.Response(
+                status_code=200,
+                json={
+                    "choices": [
+                        {
+                            "message": {
+                                "content": content_or_status,
+                            }
+                        }
+                    ]
+                },
+                request=httpx.Request("POST", url_str),
+            )
+        return original_post(self, url, *args, **kwargs)
+
+    return mock_post
+
+
+class TestLLMOrderParser:
+    """Tests for LLMParser, formatting, think tags, fences, fallbacks, and validation."""
+
+    def test_valid_response_same_lines_as_rule_parser(self, session, monkeypatch):
+        """Valid response -> same lines as rule parser for sample message:
+        'bhaiya 5 peti biscuit chhota, 2 peti washing powder 1 kilo, chai patti 250 wala 1 peti'
+        (SKU-BS-075 x5 medium, SKU-DT-1KG x2, SKU-TE-250 x1 out_of_stock; preview payable 7948.00)
+        """
+        llm_json = json.dumps({
+            "lines": [
+                {
+                    "original_words": "bhaiya 5 peti biscuit chhota",
+                    "qty": 5,
+                    "unit": "case",
+                    "item_text": "biscuit chhota",
+                },
+                {
+                    "original_words": "2 peti washing powder 1 kilo",
+                    "qty": 2,
+                    "unit": "case",
+                    "item_text": "washing powder 1 kilo",
+                },
+                {
+                    "original_words": "chai patti 250 wala 1 peti",
+                    "qty": 1,
+                    "unit": "case",
+                    "item_text": "chai patti 250 wala",
+                },
+            ]
+        })
+        monkeypatch.setattr(httpx.Client, "post", make_llm_mock(llm_json))
+
+        parser = LLMParser()
+        text = "bhaiya 5 peti biscuit chhota, 2 peti washing powder 1 kilo, chai patti 250 wala 1 peti"
+        res = parser.parse(text, retailer_id=3, session=session)
+        assert len(res.lines) == 3
+
+        # Line 1: biscuit chhota
+        l1 = res.lines[0]
+        assert l1.sku_code == "SKU-BS-075"
+        assert l1.qty == 5
+        assert l1.unit == "case"
+        assert l1.confidence == "medium"
+        assert "SKU-BS-150" in l1.alternatives
+
+        # Line 2: washing powder 1 kilo
+        l2 = res.lines[1]
+        assert l2.sku_code == "SKU-DT-1KG"
+        assert l2.qty == 2
+        assert l2.unit == "case"
+
+        # Line 3: chai patti 250 wala (out of stock)
+        l3 = res.lines[2]
+        assert l3.sku_code == "SKU-TE-250"
+        assert l3.qty == 1
+        assert l3.unit == "case"
+        assert "out_of_stock" in l3.flags
+
+    def test_llm_post_capture_preview_payable_7948(self, client: TestClient, monkeypatch):
+        """Preview quote with LLM parser yields payable 7948.00 before GST (tea excluded)."""
+        llm_json = json.dumps({
+            "lines": [
+                {
+                    "original_words": "bhaiya 5 peti biscuit chhota",
+                    "qty": 5,
+                    "unit": "case",
+                    "item_text": "biscuit chhota",
+                },
+                {
+                    "original_words": "2 peti washing powder 1 kilo",
+                    "qty": 2,
+                    "unit": "case",
+                    "item_text": "washing powder 1 kilo",
+                },
+                {
+                    "original_words": "chai patti 250 wala 1 peti",
+                    "qty": 1,
+                    "unit": "case",
+                    "item_text": "chai patti 250 wala",
+                },
+            ]
+        })
+        monkeypatch.setattr(httpx.Client, "post", make_llm_mock(llm_json))
+        monkeypatch.setenv("CAPTURE_PARSER", "llm")
+
+        token = login_as(client, phone="9826011111")
+        response = client.post(
+            "/capture",
+            json={
+                "retailer_id": 1,
+                "text": "bhaiya 5 peti biscuit chhota, 2 peti washing powder 1 kilo, chai patti 250 wala 1 peti",
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["lines"]) == 3
+        assert data["preview_quote"] is not None
+        assert float(data["preview_quote"]["subtotal"]) == pytest.approx(7948.00)
+
+    def test_response_with_think_block(self, session, monkeypatch):
+        """Strip any <think>...</think> block before parsing."""
+        raw = "<think>Analyzing user message and matching products.</think>" + json.dumps({
+            "lines": [
+                {
+                    "original_words": "5 peti biscuit chhota",
+                    "qty": 5,
+                    "unit": "case",
+                    "item_text": "biscuit chhota",
+                }
+            ]
+        })
+        monkeypatch.setattr(httpx.Client, "post", make_llm_mock(raw))
+        parser = LLMParser()
+        res = parser.parse("5 peti biscuit chhota", retailer_id=1, session=session)
+        assert len(res.lines) == 1
+        assert res.lines[0].sku_code == "SKU-BS-075"
+        assert res.lines[0].qty == 5
+        assert res.lines[0].unit == "case"
+
+    def test_json_inside_code_fences(self, session, monkeypatch):
+        """Extract JSON even when wrapped in markdown code fences."""
+        raw = "```json\n" + json.dumps({
+            "lines": [
+                {
+                    "original_words": "5 peti biscuit chhota",
+                    "qty": 5,
+                    "unit": "case",
+                    "item_text": "biscuit chhota",
+                }
+            ]
+        }) + "\n```"
+        monkeypatch.setattr(httpx.Client, "post", make_llm_mock(raw))
+        parser = LLMParser()
+        res = parser.parse("5 peti biscuit chhota", retailer_id=1, session=session)
+        assert len(res.lines) == 1
+        assert res.lines[0].sku_code == "SKU-BS-075"
+        assert res.lines[0].qty == 5
+
+    def test_invalid_json_fallback_used(self, session, monkeypatch, caplog):
+        """Invalid JSON -> fallback to RuleBasedParser immediately."""
+        monkeypatch.setattr(httpx.Client, "post", make_llm_mock("THIS IS NOT JSON {{{"))
+        parser = LLMParser()
+        res = parser.parse("5 peti biscuit chhota", retailer_id=1, session=session)
+        assert len(res.lines) == 1
+        assert res.lines[0].sku_code == "SKU-BS-075"
+        assert res.lines[0].qty == 5
+        assert res.lines[0].unit == "case"
+
+    def test_timeout_fallback_used(self, session, monkeypatch):
+        """Timeout (10s) -> fallback to RuleBasedParser immediately."""
+        timeout_err = httpx.TimeoutException("Read timed out after 10.0s")
+        monkeypatch.setattr(httpx.Client, "post", make_llm_mock(timeout_err, is_exception=True))
+        parser = LLMParser()
+        res = parser.parse("5 peti biscuit chhota", retailer_id=1, session=session)
+        assert len(res.lines) == 1
+        assert res.lines[0].sku_code == "SKU-BS-075"
+        assert res.lines[0].qty == 5
+
+    def test_http_429_fallback_used(self, session, monkeypatch):
+        """HTTP 429 -> fallback to RuleBasedParser immediately."""
+        monkeypatch.setattr(httpx.Client, "post", make_llm_mock(429))
+        parser = LLMParser()
+        res = parser.parse("2 peti washing powder 1 kilo", retailer_id=1, session=session)
+        assert len(res.lines) == 1
+        assert res.lines[0].sku_code == "SKU-DT-1KG"
+        assert res.lines[0].qty == 2
+
+    def test_response_containing_invented_sku_code_ignored(self, session, monkeypatch):
+        """The LLM must never return or invent a SKU code; ignore any sku field it sends."""
+        raw = json.dumps({
+            "lines": [
+                {
+                    "original_words": "5 peti biscuit chhota",
+                    "qty": 5,
+                    "unit": "case",
+                    "item_text": "biscuit chhota",
+                    "sku": "INVENTED-SKU-999",
+                    "sku_code": "HALLUCINATED-CODE",
+                }
+            ]
+        })
+        monkeypatch.setattr(httpx.Client, "post", make_llm_mock(raw))
+        parser = LLMParser()
+        res = parser.parse("5 peti biscuit chhota", retailer_id=1, session=session)
+        assert len(res.lines) == 1
+        # SKU code comes from internal matcher, invented code is ignored
+        assert res.lines[0].sku_code == "SKU-BS-075"
+
+    def test_unit_not_in_original_words_becomes_unknown(self, session, monkeypatch):
+        """'3 biscuit' with an LLM response that says unit=case -> unit becomes unknown."""
+        raw = json.dumps({
+            "lines": [
+                {
+                    "original_words": "3 biscuit",
+                    "qty": 3,
+                    "unit": "case",
+                    "item_text": "biscuit",
+                }
+            ]
+        })
+        monkeypatch.setattr(httpx.Client, "post", make_llm_mock(raw))
+        parser = LLMParser()
+        res = parser.parse("3 biscuit", retailer_id=1, session=session)
+        assert len(res.lines) == 1
+        assert res.lines[0].qty == 3
+        assert res.lines[0].unit == "unknown"
+        assert "needs_unit" in res.lines[0].flags
+        assert res.lines[0].sku_code == "SKU-BS-075"
+
+    def test_get_parser_selection(self, monkeypatch):
+        """Test CAPTURE_PARSER selection between rule, llm, and auto."""
+        monkeypatch.setenv("CAPTURE_PARSER", "rule")
+        assert isinstance(get_parser(), RuleBasedParser)
+        monkeypatch.setenv("CAPTURE_PARSER", "llm")
+        assert isinstance(get_parser(), LLMParser)
+        monkeypatch.setenv("CAPTURE_PARSER", "auto")
+        assert isinstance(get_parser(), LLMParser)
 
 
 class TestCaptureEndpointAndLifecycle:

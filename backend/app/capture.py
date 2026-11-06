@@ -3,16 +3,35 @@
 Pure domain parsing module:
 - Must NOT import FastAPI.
 - Defines OrderParser protocol.
-- Provides RuleBasedParser (default) and stub LLMParser (selected via ORDER_PARSER_MODE=llm).
+- Provides RuleBasedParser (default and fallback) and LLMParser.
 - Multilingual and vernacular parsing: Hinglish, Hindi, Devanagari digits, units, and size hints.
 """
 
 from dataclasses import dataclass, field
 import json
+import logging
 import os
 import re
 from typing import Any, Dict, List, Optional, Protocol, Tuple
+
+from dotenv import load_dotenv
+import httpx
+from pydantic import BaseModel, Field
 from sqlmodel import select
+
+# -----------------------------------------------------------------------------
+# Provider Settings & Configuration
+# -----------------------------------------------------------------------------
+# Hardcoded provider settings as constants in one block at top of file
+LLM_BASE_URL = "https://api.groq.com/openai/v1"
+LLM_MODEL = "qwen/qwen3.8-27b"
+
+# Read only LLM_API_KEY and CAPTURE_PARSER from root .env using python-dotenv
+load_dotenv()
+LLM_API_KEY = os.getenv("LLM_API_KEY", "")
+CAPTURE_PARSER = os.getenv("CAPTURE_PARSER", "rule").lower()
+
+logger = logging.getLogger("orderease.capture")
 
 # Path to dictionary resource
 DICT_PATH = os.path.join(os.path.dirname(__file__), "capture_dictionary.json")
@@ -67,13 +86,19 @@ class OrderParser(Protocol):
         ...
 
 
-class LLMParser:
-    """Stub LLM parser for future advanced generative parsing."""
+class LLMLineItem(BaseModel):
+    original_words: str
+    qty: Optional[int] = None
+    unit: str = "unknown"
+    item_text: str = ""
 
-    def parse(self, text: str, retailer_id: int, session: Any) -> CaptureResult:
-        raise NotImplementedError(
-            "LLMParser is not implemented yet. Set ORDER_PARSER_MODE=rule to use RuleBasedParser."
-        )
+    model_config = {"extra": "ignore"}
+
+
+class LLMResponse(BaseModel):
+    lines: List[LLMLineItem] = Field(default_factory=list)
+
+    model_config = {"extra": "ignore"}
 
 
 class RuleBasedParser:
@@ -95,7 +120,6 @@ class RuleBasedParser:
 
     def _split_into_lines(self, text: str) -> List[str]:
         """Splits message on commas, 'aur', 'and', '+', and newlines."""
-        # Split pattern matches commas, newlines, +, and words 'aur' / 'and'
         pattern = r",|\band\b|\baur\b|\+|\n"
         parts = re.split(pattern, text, flags=re.IGNORECASE)
         segments = [p.strip() for p in parts if p.strip()]
@@ -112,7 +136,6 @@ class RuleBasedParser:
         norm = self._normalize_digits(text.lower())
 
         # 1. Look for quantity directly adjacent to any unit word
-        # (e.g. '5 peti', '1 peti', '५ पेटी', 'do peti', or 'peti 5')
         all_unit_words = []
         for words in self.unit_words.values():
             all_unit_words.extend(words)
@@ -148,7 +171,7 @@ class RuleBasedParser:
             if val in self.number_words:
                 return self.number_words[val]
 
-        # 2. If no quantity adjacent to unit, mask out size hints so they aren't mistaken for quantities
+        # 2. If no quantity adjacent to unit, mask out size hints
         size_mask_pat = (
             r"(?:^|[\s,.\-+!()\[\]/\\])\d+\s*"
             r"(?:wala|wale|wali|वाला|वाले|वाली|kilo|kg|k|gm|g|gram|ग्राम|किलो|ml|l|liter|लीटर|rupey|rs|rupee|रुपये|रु)"
@@ -198,6 +221,113 @@ class RuleBasedParser:
         cleaned = re.sub(r"\s+", " ", cleaned).strip()
         return cleaned
 
+    def match_item(
+        self,
+        item_text: str,
+        original_words: str,
+        alias_map: Dict[str, str],
+        past_sku_counts: Dict[str, int],
+        all_skus: Dict[str, Any],
+    ) -> Tuple[Optional[str], str, List[str], List[str]]:
+        """Matches an item through aliases, keywords, and past order history.
+
+        Returns:
+            (sku_code, confidence, alternatives, flags)
+        """
+        norm_words = self._normalize_digits(original_words.lower())
+        clean_words = self._clean_for_alias_match(norm_words)
+
+        norm_item = self._normalize_digits(item_text.lower())
+        clean_item = self._clean_for_alias_match(norm_item)
+
+        matched_sku: Optional[str] = None
+        confidence = "low"
+        alternatives: List[str] = []
+        flags: List[str] = []
+
+        # -----------------------------------------------------------------
+        # Step (a): Retailer's Alias exact match -> High Confidence
+        # -----------------------------------------------------------------
+        for cand in [norm_words, clean_words, norm_item, clean_item]:
+            if cand in alias_map:
+                matched_sku = alias_map[cand]
+                confidence = "high"
+                break
+
+        if not matched_sku:
+            for alias_words, alias_sku in alias_map.items():
+                if alias_words and (
+                    alias_words in norm_words
+                    or alias_words in clean_words
+                    or alias_words in norm_item
+                    or alias_words in clean_item
+                ):
+                    matched_sku = alias_sku
+                    confidence = "high"
+                    break
+
+        # -----------------------------------------------------------------
+        # Step (b) & (c): Keyword match from dictionary + competing SKUs
+        # -----------------------------------------------------------------
+        if not matched_sku:
+            best_cat = None
+            matched_keyword_len = 0
+
+            # Match longest category keyword against item_text and original words
+            for cat_name, cat_data in self.categories.items():
+                for kw in cat_data.get("keywords", []):
+                    if self._term_matches(kw, norm_item) or self._term_matches(kw, norm_words):
+                        if len(kw) > matched_keyword_len:
+                            matched_keyword_len = len(kw)
+                            best_cat = (cat_name, cat_data)
+
+            if best_cat:
+                cat_name, cat_data = best_cat
+                skus_dict = cat_data.get("skus", {})
+
+                # Check size hints
+                best_sku_code = None
+                for sku_code, sku_info in skus_dict.items():
+                    for hint in sku_info.get("hints", []):
+                        if self._term_matches(hint, norm_item) or self._term_matches(hint, norm_words):
+                            best_sku_code = sku_code
+                            break
+                    if best_sku_code:
+                        break
+
+                # If no size hint, boost by past orders
+                if not best_sku_code:
+                    cat_skus = list(skus_dict.keys())
+                    boosted_sku = max(
+                        cat_skus,
+                        key=lambda c: past_sku_counts.get(c, 0),
+                        default=None,
+                    )
+                    if boosted_sku and past_sku_counts.get(boosted_sku, 0) > 0:
+                        best_sku_code = boosted_sku
+                    else:
+                        best_sku_code = cat_data.get("default_sku")
+
+                matched_sku = best_sku_code
+                # Competing similar SKUs in same category -> medium confidence with alternatives
+                competing = [sc for sc in skus_dict.keys() if sc != matched_sku]
+                alternatives = competing[:2]
+                confidence = "medium" if competing else "high"
+
+        # -----------------------------------------------------------------
+        # Step (d): No Match -> Low Confidence, no SKU
+        # -----------------------------------------------------------------
+        if not matched_sku:
+            confidence = "low"
+            flags.append("no_match")
+        else:
+            # Check out of stock flag
+            sku_obj = all_skus.get(matched_sku)
+            if sku_obj and sku_obj.stock_cases <= 0:
+                flags.append("out_of_stock")
+
+        return matched_sku, confidence, alternatives, flags
+
     def parse(self, text: str, retailer_id: int, session: Any) -> CaptureResult:
         from backend.app.models import Alias, SKU, Order, OrderLine
 
@@ -231,93 +361,16 @@ class RuleBasedParser:
         for segment in segments:
             qty = self._extract_quantity(segment)
             unit = self._extract_unit(segment)
-            norm_seg = self._normalize_digits(segment.lower())
-            clean_seg = self._clean_for_alias_match(norm_seg)
 
-            matched_sku: Optional[str] = None
-            confidence = "low"
-            alternatives: List[str] = []
-            flags: List[str] = []
+            matched_sku, confidence, alternatives, flags = self.match_item(
+                item_text=segment,
+                original_words=segment,
+                alias_map=alias_map,
+                past_sku_counts=past_sku_counts,
+                all_skus=all_skus,
+            )
 
-            # -----------------------------------------------------------------
-            # Step (a): Retailer's Alias exact match -> High Confidence
-            # -----------------------------------------------------------------
-            # Check direct match on segment or stripped clean_seg
-            if norm_seg in alias_map:
-                matched_sku = alias_map[norm_seg]
-                confidence = "high"
-            elif clean_seg in alias_map:
-                matched_sku = alias_map[clean_seg]
-                confidence = "high"
-            else:
-                # Check substring match for alias if alias is a substantial phrase
-                for alias_words, alias_sku in alias_map.items():
-                    if alias_words and (alias_words in norm_seg or alias_words in clean_seg):
-                        matched_sku = alias_sku
-                        confidence = "high"
-                        break
-
-            # -----------------------------------------------------------------
-            # Step (b) & (c): Keyword match from dictionary + competing SKUs
-            # -----------------------------------------------------------------
-            if not matched_sku:
-                best_cat = None
-                matched_keyword_len = 0
-
-                # Match longest category keyword
-                for cat_name, cat_data in self.categories.items():
-                    for kw in cat_data.get("keywords", []):
-                        if self._term_matches(kw, norm_seg):
-                            if len(kw) > matched_keyword_len:
-                                matched_keyword_len = len(kw)
-                                best_cat = (cat_name, cat_data)
-
-                if best_cat:
-                    cat_name, cat_data = best_cat
-                    skus_dict = cat_data.get("skus", {})
-
-                    # Check size hints
-                    best_sku_code = None
-                    for sku_code, sku_info in skus_dict.items():
-                        for hint in sku_info.get("hints", []):
-                            if self._term_matches(hint, norm_seg):
-                                best_sku_code = sku_code
-                                break
-                        if best_sku_code:
-                            break
-
-                    # If no size hint, boost by past orders
-                    if not best_sku_code:
-                        cat_skus = list(skus_dict.keys())
-                        boosted_sku = max(
-                            cat_skus,
-                            key=lambda c: past_sku_counts.get(c, 0),
-                            default=None,
-                        )
-                        if boosted_sku and past_sku_counts.get(boosted_sku, 0) > 0:
-                            best_sku_code = boosted_sku
-                        else:
-                            best_sku_code = cat_data.get("default_sku")
-
-                    matched_sku = best_sku_code
-                    # Competing similar SKUs in same category -> medium confidence with alternatives
-                    competing = [sc for sc in skus_dict.keys() if sc != matched_sku]
-                    alternatives = competing[:2]
-                    confidence = "medium" if competing else "high"
-
-            # -----------------------------------------------------------------
-            # Step (d): No Match -> Low Confidence, no SKU
-            # -----------------------------------------------------------------
-            if not matched_sku:
-                confidence = "low"
-                flags.append("no_match")
-            else:
-                # Check out of stock flag
-                sku_obj = all_skus.get(matched_sku)
-                if sku_obj and sku_obj.stock_cases <= 0:
-                    flags.append("out_of_stock")
-
-            if unit == "unknown":
+            if unit == "unknown" and "needs_unit" not in flags:
                 flags.append("needs_unit")
 
             parsed_lines.append(
@@ -339,10 +392,182 @@ class RuleBasedParser:
         )
 
 
+class LLMParser:
+    """LLM-based order parser using httpx against an OpenAI-compatible /chat/completions endpoint."""
+
+    def __init__(
+        self,
+        base_url: str = LLM_BASE_URL,
+        model: str = LLM_MODEL,
+        api_key: Optional[str] = None,
+        timeout: float = 10.0,
+    ):
+        self.base_url = base_url
+        self.model = model
+        self.api_key = api_key if api_key is not None else os.getenv("LLM_API_KEY", LLM_API_KEY)
+        self.timeout = timeout
+        self.fallback = RuleBasedParser()
+
+    def _validate_unit(self, unit: str, original_words: str) -> str:
+        """If the LLM returns a unit that does not appear in the original words, set to unknown."""
+        if unit not in ("case", "piece"):
+            return "unknown"
+        candidates = self.fallback.unit_words.get(unit, [])
+        all_candidates = set(candidates) | {unit}
+        norm = original_words.lower()
+        for cand in all_candidates:
+            if RuleBasedParser._term_matches(cand, norm):
+                return unit
+        return "unknown"
+
+    def parse(self, text: str, retailer_id: int, session: Any) -> CaptureResult:
+        try:
+            return self._parse_with_llm(text, retailer_id, session)
+        except Exception as exc:
+            logger.warning("LLM parsing failed: %s; falling back to RuleBasedParser", exc)
+            return self.fallback.parse(text, retailer_id, session)
+
+    def _parse_with_llm(self, text: str, retailer_id: int, session: Any) -> CaptureResult:
+        from backend.app.models import SKU, Alias, Order, OrderLine
+
+        all_skus = {s.code: s for s in session.exec(select(SKU)).all()}
+        catalog_lines = "\n".join(f"- {s.code}: {s.name}" for s in all_skus.values())
+
+        system_prompt = (
+            "You are an FMCG wholesale order capture assistant for Indian kirana stores.\n"
+            "Given a customer's order message and a product catalog, extract the ordered items into a JSON object.\n"
+            "Output JSON with this exact structure:\n"
+            '{"lines": [{"original_words": "<exact line segment>", "qty": <int or null>, '
+            '"unit": "<case|piece|unknown>", "item_text": "<item description without quantity/unit>"}]}\n'
+            "Rules:\n"
+            "1. Output ONLY valid JSON, with no explanation or surrounding prose.\n"
+            "2. Temperature is 0.\n"
+            "3. unit must be strictly 'case', 'piece', or 'unknown'. If no unit word appears in original_words, use 'unknown'.\n"
+            "4. NEVER invent or output any sku or sku_code field."
+        )
+
+        user_content = f"Catalog:\n{catalog_lines}\n\nOrder message:\n{text}"
+
+        payload = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_content},
+            ],
+            "temperature": 0,
+            "chat_template_kwargs": {"thinking": False},
+        }
+
+        url = f"{self.base_url.rstrip('/')}/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+
+        with httpx.Client(timeout=self.timeout) as client:
+            response = client.post(url, json=payload, headers=headers)
+            if response.status_code == 429 or response.status_code >= 500:
+                raise httpx.HTTPStatusError(
+                    f"HTTP {response.status_code}",
+                    request=response.request,
+                    response=response,
+                )
+            response.raise_for_status()
+            resp_data = response.json()
+
+        raw_content = resp_data["choices"][0]["message"]["content"]
+        if not raw_content or not raw_content.strip():
+            raise ValueError("LLM returned empty content")
+
+        # Strip any <think>...</think> block before parsing
+        cleaned = re.sub(r"<think>[\s\S]*?</think>", "", raw_content, flags=re.DOTALL).strip()
+
+        # Extract JSON even when wrapped in code fences
+        fence_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", cleaned)
+        if fence_match:
+            cleaned = fence_match.group(1).strip()
+        else:
+            start = cleaned.find("{")
+            end = cleaned.rfind("}")
+            if start != -1 and end != -1 and end > start:
+                cleaned = cleaned[start : end + 1]
+
+        if not cleaned:
+            raise ValueError("No JSON block found in LLM output")
+
+        parsed_json = json.loads(cleaned)
+        llm_response = LLMResponse.model_validate(parsed_json)
+        if not llm_response.lines:
+            raise ValueError("LLM response contains no lines")
+
+        # Pre-fetch aliases for this retailer
+        aliases = session.exec(
+            select(Alias).where(Alias.retailer_id == retailer_id)
+        ).all()
+        alias_map = {a.original_words.strip().lower(): a.sku_code for a in aliases}
+
+        # Pre-fetch past order counts
+        past_sku_counts: Dict[str, int] = {}
+        try:
+            past_orders = session.exec(
+                select(Order).where(Order.retailer_id == retailer_id)
+            ).all()
+            for po in past_orders:
+                lines = session.exec(
+                    select(OrderLine).where(OrderLine.order_id == po.id)
+                ).all()
+                for ol in lines:
+                    past_sku_counts[ol.sku_code] = past_sku_counts.get(ol.sku_code, 0) + ol.qty_cases
+        except Exception:
+            pass
+
+        parsed_lines: List[ParsedLine] = []
+        for line in llm_response.lines:
+            orig = line.original_words
+            item_text = line.item_text or orig
+
+            # Validate unit against original words
+            unit = self._validate_unit(line.unit, orig)
+
+            # Validate quantity
+            qty = line.qty
+            if qty is None:
+                qty = self.fallback._extract_quantity(orig)
+
+            # Match item through aliases, keywords, and history (ignoring any LLM sku)
+            matched_sku, confidence, alternatives, flags = self.fallback.match_item(
+                item_text=item_text,
+                original_words=orig,
+                alias_map=alias_map,
+                past_sku_counts=past_sku_counts,
+                all_skus=all_skus,
+            )
+
+            if unit == "unknown" and "needs_unit" not in flags:
+                flags.append("needs_unit")
+
+            parsed_lines.append(
+                ParsedLine(
+                    original_words=orig,
+                    sku_code=matched_sku,
+                    qty=qty,
+                    unit=unit,
+                    confidence=confidence,
+                    alternatives=alternatives,
+                    flags=flags,
+                )
+            )
+
+        return CaptureResult(
+            retailer_id=retailer_id,
+            raw_text=text,
+            lines=parsed_lines,
+        )
+
+
 def get_parser() -> OrderParser:
-    """Factory selecting OrderParser based on ORDER_PARSER_MODE env var."""
-    mode = os.getenv("ORDER_PARSER_MODE", "rule").lower()
-    if mode == "llm":
+    """Factory selecting OrderParser based on CAPTURE_PARSER env var (rule | llm | auto)."""
+    mode = os.getenv("CAPTURE_PARSER", os.getenv("ORDER_PARSER_MODE", "rule")).lower()
+    if mode in ("llm", "auto"):
         return LLMParser()
     return RuleBasedParser()
-

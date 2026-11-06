@@ -69,11 +69,11 @@ Build screens for retailer and order_desk only. Salesman and owner are data-mode
 - Unknown unit means ask, never guess. Never invent items. Out-of-stock lines are flagged, not dropped.
 - Matching order: retailer's Alias (high), keyword plus past orders, ambiguous between sizes (medium), otherwise low.
 - The person confirms through `POST /orders`. Desk corrections to a captured line save an Alias for that retailer.
-- Parser is pluggable: `RuleBasedParser` is the default, `LLMParser` is an optional stub.
+- Parser is pluggable: `RuleBasedParser` is the default and fallback. `LLMParser` connects via OpenAI-compatible endpoint with automatic fallback on any failure (`CAPTURE_PARSER=rule|llm|auto`).
 - Retailer capture is forced to their own retailer_id. Desk and owner may pass any.
 
 ## API
-Built: `POST /auth/otp`, `GET /catalogue`, `POST /cart/quote`, `POST /orders`, `GET /orders/mine`, `GET /retailers` (desk/owner), `GET /desk/orders`, `GET /desk/orders/{id}`, `PATCH /desk/orders/{id}`, `POST /capture`.
+Built: `POST /auth/otp`, `GET /catalogue`, `POST /cart/quote`, `POST /orders`, `GET /orders/mine`, `GET /retailers` (desk/owner), `GET /desk/orders`, `GET /desk/orders/{id}`, `PATCH /desk/orders/{id}`, `POST /capture` (rule & LLM parsers).
 Planned: `GET /desk/export/tally?format=xml|csv`.
 Later: `GET /retailers/{id}`, `GET /retailers/{id}/orders`.
 Auth: mock OTP `123456`, JWT with user_id, role, retailer_id. Wrong OTP gives 401.
