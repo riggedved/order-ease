@@ -21,7 +21,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <>
-      <header className="px-4 py-2.5 border-b border-border bg-surface sticky top-0 z-30 flex items-center justify-between min-h-[56px] select-none">
+      <header className="px-4 py-2.5 border-b border-border bg-surface sticky top-0 z-30 flex items-center justify-between h-14 min-h-[56px] select-none">
         {/* Left Side */}
         <div className="flex flex-col min-w-0 pr-2">
           {!user ? (

@@ -302,12 +302,12 @@ export const OrderByMessage: React.FC<OrderByMessageProps> = ({
   };
 
   return (
-    <div className="flex flex-col flex-1 px-4 py-4 bg-surface select-none">
+    <div className="flex flex-col flex-1 px-4 pt-0 pb-4 bg-surface select-none">
       {/* ================= STEP 1: INPUT PAGE ================= */}
       {step === 'input' && (
         <div className="flex flex-col w-full pb-28">
-          {/* 2. "Back to catalogue" link */}
-          <div className="mb-2">
+          {/* 2. "Back to catalogue" link (Pinned) */}
+          <div className="sticky top-14 z-20 bg-surface -mx-4 px-4 py-2.5 border-b border-border mb-4 flex items-center">
             <button
               type="button"
               onClick={onBackToCatalogue}
@@ -438,8 +438,8 @@ export const OrderByMessage: React.FC<OrderByMessageProps> = ({
       {/* ================= STEP 2: REVIEW PAGE ================= */}
       {step === 'review' && (
         <div className="flex flex-col w-full pb-44">
-          {/* Back link */}
-          <div className="mb-2">
+          {/* Back link (Pinned) */}
+          <div className="sticky top-14 z-20 bg-surface -mx-4 px-4 py-2.5 border-b border-border mb-4 flex items-center">
             <button
               type="button"
               onClick={() => setStep('input')}

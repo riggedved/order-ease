@@ -161,7 +161,7 @@ export const CatalogueScreen: React.FC<CatalogueScreenProps> = ({
       <button
         type="button"
         onClick={onOpenOrderByMessage}
-        className="w-full min-tap h-12 px-4 border border-primary rounded-xl bg-white flex items-center justify-center space-x-2 text-primary font-bold text-sm hover:bg-primary-50 active:bg-primary-50 focus:outline-none transition-colors mb-3 select-none"
+        className="w-full min-tap h-12 px-4 border border-primary rounded-xl bg-white flex items-center justify-center space-x-2 text-primary font-bold text-sm hover:bg-primary-50 active:bg-primary-50 focus:outline-none transition-colors mb-1.5 select-none"
       >
         <svg
           className="w-5 h-5 shrink-0 text-primary"
@@ -179,62 +179,65 @@ export const CatalogueScreen: React.FC<CatalogueScreenProps> = ({
         <span>{t.order_by_message}</span>
       </button>
 
-      {/* 2. Search Bar: 44-48px tall */}
-      <div className="relative mb-3">
-        <input
-          id="product-search"
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder={t.search_placeholder}
-          className="w-full min-h-[44px] h-12 pl-10 pr-4 text-sm bg-white border border-border rounded-xl text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none transition-colors"
-        />
-        <span className="absolute left-3.5 top-3.5 text-ink-muted pointer-events-none">
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-          </svg>
-        </span>
-        {searchQuery && (
-          <button
-            type="button"
-            onClick={() => setSearchQuery('')}
-            className="absolute right-3 top-3 text-ink-muted hover:text-ink p-1"
-            aria-label="Clear search"
-          >
-            ✕
-          </button>
-        )}
-      </div>
-
-      {/* 3. Category Filter Chips: 44-48px tall */}
-      <div className="flex space-x-2 overflow-x-auto no-scrollbar pb-2 mb-3.5">
-        {categories.map((cat) => {
-          const isSelected = selectedCategory === cat;
-          return (
-            <button
-              key={cat}
-              type="button"
-              onClick={() => setSelectedCategory(cat)}
-              className={`min-h-[44px] h-[46px] px-4 rounded-xl text-xs font-semibold border flex items-center justify-center whitespace-nowrap transition-colors select-none ${
-                isSelected
-                  ? 'bg-primary text-white border-primary'
-                  : 'bg-white text-ink border-border hover:bg-gray-50'
-              }`}
+      {/* Pinned Search Bar & Category Filter Chips */}
+      <div className="sticky top-14 z-20 bg-surface -mx-3.5 px-3.5 pt-2 pb-2.5 border-b border-border mb-3.5">
+        {/* 2. Search Bar: 44-48px tall */}
+        <div className="relative mb-2.5">
+          <input
+            id="product-search"
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={t.search_placeholder}
+            className="w-full min-h-[44px] h-12 pl-10 pr-4 text-sm bg-white border border-border rounded-xl text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none transition-colors"
+          />
+          <span className="absolute left-3.5 top-3.5 text-ink-muted pointer-events-none">
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
             >
-              {getCategoryLabel(cat, lang)}
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+          </span>
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-3 text-ink-muted hover:text-ink p-1"
+              aria-label="Clear search"
+            >
+              ✕
             </button>
-          );
-        })}
+          )}
+        </div>
+
+        {/* 3. Category Filter Chips: 44-48px tall */}
+        <div className="flex space-x-2 overflow-x-auto no-scrollbar pb-0.5">
+          {categories.map((cat) => {
+            const isSelected = selectedCategory === cat;
+            return (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setSelectedCategory(cat)}
+                className={`min-h-[44px] h-[46px] px-4 rounded-xl text-xs font-semibold border flex items-center justify-center whitespace-nowrap transition-colors select-none ${
+                  isSelected
+                    ? 'bg-primary text-white border-primary'
+                    : 'bg-white text-ink border-border hover:bg-gray-50'
+                }`}
+              >
+                {getCategoryLabel(cat, lang)}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* 4. Empty Search Results */}

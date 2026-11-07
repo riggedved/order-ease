@@ -113,9 +113,9 @@ export const CartView: React.FC<CartViewProps> = ({
 
   if (activeLines.length === 0 && !orderSuccess) {
     return (
-      <div className="flex flex-col flex-1 px-4 pt-6 pb-8 bg-surface">
-        {/* Back Button */}
-        <div className="flex items-center pb-4 border-b border-border mb-6">
+      <div className="flex flex-col flex-1 px-4 pt-0 pb-8 bg-surface">
+        {/* Back Button (Pinned) */}
+        <div className="sticky top-14 z-20 bg-surface -mx-4 px-4 py-2.5 border-b border-border mb-6 flex items-center">
           <button
             type="button"
             onClick={onBackToCatalogue}
@@ -171,9 +171,9 @@ export const CartView: React.FC<CartViewProps> = ({
   }
 
   return (
-    <div className="flex flex-col flex-1 px-4 pt-6 pb-36 bg-surface">
-      {/* Top Header Bar */}
-      <div className="flex items-center justify-between pb-3 border-b border-border mb-4">
+    <div className="flex flex-col flex-1 px-4 pt-0 pb-36 bg-surface">
+      {/* Top Header Bar (Pinned) */}
+      <div className="sticky top-14 z-20 bg-surface -mx-4 px-4 py-2.5 border-b border-border mb-4 flex items-center justify-between">
         <button
           type="button"
           onClick={onBackToCatalogue}
