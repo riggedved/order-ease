@@ -192,3 +192,13 @@ class RetailerSimpleResponse(BaseModel):
     name: str
     phone: Optional[str] = None
 
+
+class UserMeResponse(BaseModel):
+    id: int
+    name: str
+    user_name: Optional[str] = None
+    role: str
+    retailer_id: Optional[int] = None
+    retailer_name: Optional[str] = None
+
+

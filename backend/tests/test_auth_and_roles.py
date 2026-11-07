@@ -39,6 +39,56 @@ class TestAuthAndOTP:
         assert data["role"] == Role.RETAILER.value
         assert data["retailer_id"] == 1
         assert data["user_id"] is not None
+        assert data["user_name"] == "Ramesh Gupta"
+        assert data["retailer_name"] == "Gupta Kirana Store"
+
+    def test_login_seeded_retailer_returns_retailer_name(self, client: TestClient):
+        """Logging in as a seeded retailer returns that retailer's name."""
+        response = client.post("/auth/otp", json={"phone": "9826011111", "otp": "123456"})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["role"] == "retailer"
+        assert data["user_name"] == "Ramesh Gupta"
+        assert data["retailer_name"] == "Gupta Kirana Store"
+        assert data["retailer_id"] == 1
+
+    def test_login_desk_returns_retailer_name_null(self, client: TestClient):
+        """A desk login returns retailer_name null."""
+        response = client.post("/auth/otp", json={"phone": "9826000001", "otp": "123456"})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["role"] == "order_desk"
+        assert data["user_name"] == "Desk Officer Priya"
+        assert data["retailer_name"] is None
+        assert data["retailer_id"] is None
+
+    def test_get_me_returns_user_info_for_retailer_and_staff(self, client: TestClient):
+        """GET /me returns user id, name, role, retailer_id and retailer_name for logged-in user."""
+        # 1. Retailer
+        ret_token = login_as(client, phone="9826011111")
+        res_ret = client.get("/me", headers={"Authorization": f"Bearer {ret_token}"})
+        assert res_ret.status_code == 200
+        ret_data = res_ret.json()
+        assert ret_data["name"] == "Ramesh Gupta"
+        assert ret_data["role"] == "retailer"
+        assert ret_data["retailer_id"] == 1
+        assert ret_data["retailer_name"] == "Gupta Kirana Store"
+        assert ret_data["id"] is not None
+
+        # 2. Desk user
+        desk_token = login_as(client, phone="9826000001")
+        res_desk = client.get("/me", headers={"Authorization": f"Bearer {desk_token}"})
+        assert res_desk.status_code == 200
+        desk_data = res_desk.json()
+        assert desk_data["name"] == "Desk Officer Priya"
+        assert desk_data["role"] == "order_desk"
+        assert desk_data["retailer_id"] is None
+        assert desk_data["retailer_name"] is None
+        assert desk_data["id"] is not None
+
+        # 3. Unauthenticated -> 401
+        res_unauth = client.get("/me")
+        assert res_unauth.status_code == 401
 
     def test_unregistered_phone_returns_401(self, client: TestClient):
         """Unregistered phone number with OTP 123456 returns 401."""

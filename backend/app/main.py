@@ -52,6 +52,7 @@ from backend.app.schemas import (
     CaptureRequest,
     CaptureResponse,
     ParsedLineResponse,
+    UserMeResponse,
 )
 
 
@@ -234,6 +235,8 @@ class TokenResponse(BaseModel):
     role: str
     retailer_id: Optional[int] = None
     name: str
+    user_name: str
+    retailer_name: Optional[str] = None
 
 
 @app.post("/auth/otp", response_model=TokenResponse)
@@ -252,12 +255,20 @@ def verify_otp(payload: OTPRequest, session: Session = Depends(get_session)):
             detail="Phone number not registered",
         )
 
+    retailer_name = None
+    if user.retailer_id:
+        retailer = session.get(Retailer, user.retailer_id)
+        if retailer:
+            retailer_name = retailer.name
+
     token_data = {
         "sub": str(user.id),
         "role": user.role.value,
         "phone": user.phone,
         "retailer_id": user.retailer_id,
         "name": user.name,
+        "user_name": user.name,
+        "retailer_name": retailer_name,
     }
     token = create_access_token(token_data)
 
@@ -268,6 +279,30 @@ def verify_otp(payload: OTPRequest, session: Session = Depends(get_session)):
         role=user.role.value,
         retailer_id=user.retailer_id,
         name=user.name,
+        user_name=user.name,
+        retailer_name=retailer_name,
+    )
+
+
+@app.get("/me", response_model=UserMeResponse)
+def get_me(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Returns user id, name, role, retailer_id and retailer_name for the logged-in user."""
+    retailer_name = None
+    if current_user.retailer_id:
+        retailer = session.get(Retailer, current_user.retailer_id)
+        if retailer:
+            retailer_name = retailer.name
+
+    return UserMeResponse(
+        id=current_user.id,
+        name=current_user.name,
+        user_name=current_user.name,
+        role=current_user.role.value,
+        retailer_id=current_user.retailer_id,
+        retailer_name=retailer_name,
     )
 
 

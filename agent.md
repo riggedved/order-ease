@@ -73,7 +73,7 @@ Build screens for retailer and order_desk only. Salesman and owner are data-mode
 - Retailer capture is forced to their own retailer_id. Desk and owner may pass any.
 
 ## API
-Built: `POST /auth/otp`, `GET /catalogue`, `POST /cart/quote`, `POST /orders`, `GET /orders/mine`, `GET /retailers` (desk/owner), `GET /desk/orders`, `GET /desk/orders/{id}`, `PATCH /desk/orders/{id}`, `POST /capture` (rule & LLM parsers), `GET /desk/export/tally` (XML/CSV).
+Built: `POST /auth/otp`, `GET /me`, `GET /catalogue`, `POST /cart/quote`, `POST /orders`, `GET /orders/mine`, `GET /retailers` (desk/owner), `GET /desk/orders`, `GET /desk/orders/{id}`, `PATCH /desk/orders/{id}`, `POST /capture` (rule & LLM parsers), `GET /desk/export/tally` (XML/CSV).
 Planned: none (core slice complete).
 Later: `GET /retailers/{id}`, `GET /retailers/{id}/orders`.
 Auth: mock OTP `123456`, JWT with user_id, role, retailer_id. Wrong OTP gives 401.

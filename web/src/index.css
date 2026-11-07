@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --primary: #0C831F;
+    --primary-dark: #096317;
+    --border: #E5E7EB;
+    --ink: #111827;
+    --muted: #6B7280;
+  }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    min-height: 100vh;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background-color: #FFFFFF;
+    color: #111827;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Zero elevation policy: no shadows or gradients */
+  *, *::before, *::after {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  :focus-visible {
+    outline: 2px solid #0C831F;
+    outline-offset: 2px;
+  }
+}
+
+.min-tap {
+  min-height: 48px;
+  min-width: 48px;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
