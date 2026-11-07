@@ -121,6 +121,32 @@ class TestCartQuoteEndpoint:
         assert len(tea_line["warnings"]) > 0
         assert "out of stock" in tea_line["warnings"][0].lower()
 
+    def test_gst_only_calculated_on_items_exclusive_of_gst(self, client: TestClient):
+        """GST is only calculated on items where price_includes_gst is False."""
+        token = login_as(client, phone="9826011111")
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # SKU-BS-075: price_includes_gst=False, case_price=777.60, gst_rate=0.05
+        # SKU-BS-150: price_includes_gst=True, case_price=720.00, gst_rate=0.05
+        payload = {
+            "retailer_id": 1,
+            "lines": [
+                {"sku_code": "SKU-BS-075", "qty_cases": 1},
+                {"sku_code": "SKU-BS-150", "qty_cases": 1},
+            ],
+        }
+        res = client.post("/cart/quote", json=payload, headers=headers)
+        assert res.status_code == 200
+        data = res.json()
+
+        # SKU-BS-075 (exclusive): line_subtotal = 777.60, gst = 38.88
+        # SKU-BS-150 (inclusive): line_subtotal = 720.00, gst = 0.00
+        assert float(data["subtotal"]) == pytest.approx(1497.60)
+        assert float(data["gst_amount"]) == pytest.approx(38.88)
+        assert float(data["payable"]) == pytest.approx(1536.48)
+        assert float(data["lines"][0]["gst_amount"]) == pytest.approx(38.88)
+        assert float(data["lines"][1]["gst_amount"]) == pytest.approx(0.00)
+
 
 class TestOrdersLifecycle:
     """Tests for POST /orders, credit hold, idempotency, and server re-quoting."""

@@ -54,6 +54,39 @@ export function toSentenceCase(str: string): string {
 }
 
 /**
+ * Returns formatted case count respecting English and Hindi plural rules.
+ * e.g., 1 -> "1 case", 2 -> "2 cases"
+ * Hindi -> "1 केस", "2 केस"
+ */
+export function formatCases(count: number, lang: Language): string {
+  if (lang === 'hi') {
+    return `${count} केस`;
+  }
+  return count === 1 ? '1 case' : `${count} cases`;
+}
+
+/**
+ * Returns numeric weight in grams for sorting pack options ascendingly.
+ */
+export function getPackWeightGrams(sku: CatalogueSKU | null | undefined): number {
+  if (!sku) return 0;
+  const match = sku.name.match(/\b(\d+(?:\.\d+)?)\s*(g|kg|ml|l|gm)\b/i);
+  if (match) {
+    const val = parseFloat(match[1]);
+    const unit = match[2].toLowerCase();
+    if (unit === 'kg' || unit === 'l') return val * 1000;
+    return val;
+  }
+  if (sku.code.includes('-075')) return 75;
+  if (sku.code.includes('-100')) return 100;
+  if (sku.code.includes('-150')) return 150;
+  if (sku.code.includes('-250')) return 250;
+  if (sku.code.includes('-500')) return 500;
+  if (sku.code.includes('-1KG')) return 1000;
+  return 0;
+}
+
+/**
  * Extracts pack size from product name or code.
  * e.g., "Glucose biscuit 75 g, case of 96" -> "75 g"
  * e.g., "Detergent powder 1 kg, case of 20" -> "1 kg"

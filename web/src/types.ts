@@ -62,15 +62,27 @@ export interface TokenResponse {
 }
 
 // ---------------------------------------------------------
+// Cart Item Model
+// ---------------------------------------------------------
+export interface CartItem {
+  sku_code: string;
+  qty_cases: number;
+  original_words?: string | null;
+  unit?: string | null;
+}
+
+// ---------------------------------------------------------
 // Order Capture Types
 // ---------------------------------------------------------
 export interface ParsedLine {
+  id?: string | number;
   original_words: string;
   sku_code: string | null;
   qty: number | null;
   unit: string; // 'case' | 'piece' | 'unknown'
   confidence: string; // 'high' | 'medium' | 'low'
   alternatives: string[];
+  fixed_options?: string[]; // Presorted in ascending pack size once upon capture
   flags: string[]; // 'out_of_stock' | 'needs_unit' | 'no_match'
 }
 

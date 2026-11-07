@@ -1,15 +1,17 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Header } from './components/Header';
 import { LoginScreen } from './components/LoginScreen';
 import { CatalogueScreen } from './components/CatalogueScreen';
 import { CartView } from './components/CartView';
 import { OrderByMessage } from './components/OrderByMessage';
 import type { Language } from './i18n';
+import { translations } from './i18n';
 import type {
   UserMe,
   TokenResponse,
   CatalogueSKU,
   CartQuoteResponse,
+  CartItem,
 } from './types';
 import { fetchMe, fetchCatalogue, fetchCartQuote } from './api';
 
@@ -54,10 +56,22 @@ export function App() {
   const [catalogueError, setCatalogueError] = useState<string | null>(null);
 
   // 5. Cart State & Debounced Quote
-  const [cartQuantities, setCartQuantities] = useState<Record<string, number>>({});
+  const [cartItems, setCartItems] = useState<Record<string, CartItem>>({});
+  const [cartMessageNote, setCartMessageNote] = useState<string | null>(null);
   const [quote, setQuote] = useState<CartQuoteResponse | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const debounceTimerRef = useRef<any>(null);
+
+  // Derived simple quantities for CatalogueScreen
+  const cartQuantities = useMemo(() => {
+    const res: Record<string, number> = {};
+    for (const [code, item] of Object.entries(cartItems)) {
+      if (item.qty_cases > 0) {
+        res[code] = item.qty_cases;
+      }
+    }
+    return res;
+  }, [cartItems]);
 
   // 6. Order by message draft text (persists when navigating back to catalogue and returning)
   const [orderMessageDraft, setOrderMessageDraft] = useState('');
@@ -82,12 +96,19 @@ export function App() {
   const handleLogout = () => {
     setToken(null);
     setUser(null);
-    setCartQuantities({});
+    setCartItems({});
     setQuote(null);
+    setCartMessageNote(null);
     setOrderMessageDraft('');
     setCurrentView('catalogue');
     localStorage.removeItem('orderease_token');
     localStorage.removeItem('orderease_user');
+  };
+
+  const handleClearCart = () => {
+    setCartItems({});
+    setQuote(null);
+    setCartMessageNote(null);
   };
 
   // Refresh user data with GET /me if token is already present on initial mount
@@ -167,28 +188,75 @@ export function App() {
 
   // Update Cart Quantity handler
   const handleUpdateQty = (skuCode: string, qty: number) => {
-    setCartQuantities((prev) => {
+    setCartItems((prev) => {
       const updated = { ...prev };
       if (qty <= 0) {
         delete updated[skuCode];
       } else {
-        updated[skuCode] = qty;
+        const existing = updated[skuCode];
+        updated[skuCode] = {
+          sku_code: skuCode,
+          qty_cases: qty,
+          original_words: existing?.original_words || null,
+          unit: existing?.unit || 'case',
+        };
       }
-      triggerDebouncedQuote(updated);
+      const newQuantities: Record<string, number> = {};
+      for (const [code, item] of Object.entries(updated)) {
+        if (item.qty_cases > 0) newQuantities[code] = item.qty_cases;
+      }
+      triggerDebouncedQuote(newQuantities);
       return updated;
     });
   };
 
   // Bulk add items from OrderByMessage into Cart
-  const handleAddCapturedItemsToCart = (items: { sku_code: string; qty: number }[]) => {
-    setCartQuantities((prev) => {
+  // Requirement: sku_code, qty_cases, original_words. If already in cart, add quantities.
+  // Show note: "2 items added from your message"
+  const handleAddCapturedItemsToCart = (
+    items: {
+      sku_code: string;
+      qty_cases: number;
+      original_words?: string | null;
+      unit?: string | null;
+    }[]
+  ) => {
+    if (items.length === 0) return;
+
+    setCartItems((prev) => {
       const updated = { ...prev };
       for (const item of items) {
-        updated[item.sku_code] = (updated[item.sku_code] || 0) + item.qty;
+        const existing = updated[item.sku_code];
+        if (existing) {
+          updated[item.sku_code] = {
+            ...existing,
+            qty_cases: existing.qty_cases + item.qty_cases,
+            original_words: item.original_words || existing.original_words || null,
+            unit: item.unit || existing.unit || 'case',
+          };
+        } else {
+          updated[item.sku_code] = {
+            sku_code: item.sku_code,
+            qty_cases: item.qty_cases,
+            original_words: item.original_words || null,
+            unit: item.unit || 'case',
+          };
+        }
       }
-      triggerDebouncedQuote(updated);
+      const newQuantities: Record<string, number> = {};
+      for (const [code, item] of Object.entries(updated)) {
+        if (item.qty_cases > 0) newQuantities[code] = item.qty_cases;
+      }
+      triggerDebouncedQuote(newQuantities);
       return updated;
     });
+
+    const count = items.length;
+    setCartMessageNote(
+      count === 1
+        ? translations[lang].item_added_from_message
+        : translations[lang].items_added_from_message.replace('{count}', String(count))
+    );
     setCurrentView('cart');
   };
 
@@ -227,8 +295,14 @@ export function App() {
               quote={quote}
               quoteLoading={quoteLoading}
               catalogue={catalogue}
+              cartItems={cartItems}
               onUpdateQty={handleUpdateQty}
+              onClearCart={handleClearCart}
               onBackToCatalogue={() => setCurrentView('catalogue')}
+              cartMessageNote={cartMessageNote}
+              onDismissMessageNote={() => setCartMessageNote(null)}
+              retailerId={user.retailer_id!}
+              token={token}
             />
           ) : (
             <OrderByMessage

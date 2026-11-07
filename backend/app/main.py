@@ -175,10 +175,8 @@ def calculate_cart_quote(
         else:
             line_subtotal = res.final_line_value
             if sku.price_includes_gst:
-                # Price includes GST -> extract GST portion
-                line_gst = round_paisa(
-                    line_subtotal * sku.gst_rate / (Decimal("1.00") + sku.gst_rate)
-                )
+                # Price includes GST -> GST should only be calculated on items exclusive of GST
+                line_gst = Decimal("0.00")
                 line_pay = line_subtotal
             else:
                 # Price excludes GST -> calculate GST to add

@@ -9,9 +9,10 @@ import {
   deriveCategoriesFromCatalogue,
   getProductCategory,
   getCategoryLabel,
-  getProductImage,
   getSchemeBadgeText,
+  formatCases,
 } from '../utils';
+import { ProductImage } from './ProductImage';
 
 interface CatalogueScreenProps {
   lang: Language;
@@ -303,15 +304,10 @@ export const CatalogueScreen: React.FC<CatalogueScreenProps> = ({
                     </span>
                   )}
 
-                  {/* Lazy-loaded Flat Pack SVG Illustration */}
-                  <img
-                    src={getProductImage(sku.code)}
+                  {/* Lazy-loaded Flat Pack SVG Illustration via shared ProductImage */}
+                  <ProductImage
+                    skuCode={sku.code}
                     alt={cleanProductName(sku.name)}
-                    loading="lazy"
-                    className="w-full h-full object-contain"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).src = '/products/placeholder.svg';
-                    }}
                   />
                 </div>
 
@@ -403,7 +399,7 @@ export const CatalogueScreen: React.FC<CatalogueScreenProps> = ({
                             className="flex-1 min-w-0 text-center text-xs font-bold text-white px-1 py-1 truncate hover:underline"
                             title="Tap to type quantity"
                           >
-                            {currentQty} {t.cases}
+                            {formatCases(currentQty, lang)}
                           </button>
                         )}
 
@@ -438,7 +434,7 @@ export const CatalogueScreen: React.FC<CatalogueScreenProps> = ({
         <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[420px] bg-primary text-white p-3 z-40 border-t border-primary-dark flex items-center justify-between select-none">
           <div className="flex flex-col">
             <span className="text-xs uppercase tracking-wider text-green-100 font-medium">
-              {totalCasesInCart} {t.cases}
+              {formatCases(totalCasesInCart, lang)}
             </span>
             <div className="flex items-baseline gap-1.5">
               <span className="text-base font-bold">
