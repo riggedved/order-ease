@@ -61,3 +61,61 @@ export interface TokenResponse {
   retailer_name: string | null;
 }
 
+// ---------------------------------------------------------
+// Order Capture Types
+// ---------------------------------------------------------
+export interface ParsedLine {
+  original_words: string;
+  sku_code: string | null;
+  qty: number | null;
+  unit: string; // 'case' | 'piece' | 'unknown'
+  confidence: string; // 'high' | 'medium' | 'low'
+  alternatives: string[];
+  flags: string[]; // 'out_of_stock' | 'needs_unit' | 'no_match'
+}
+
+export interface CaptureResponse {
+  retailer_id: number;
+  raw_text: string;
+  lines: ParsedLine[];
+  preview_quote: CartQuoteResponse | null;
+}
+
+export interface OrderLineCreate {
+  sku_code: string;
+  qty_cases: number;
+  original_words?: string | null;
+  unit?: string | null;
+}
+
+export interface OrderCreatePayload {
+  retailer_id: number;
+  lines: OrderLineCreate[];
+  source?: 'retailer_app' | 'retailer_capture';
+  client_request_id?: string;
+}
+
+export interface OrderResponseLine {
+  id?: number | null;
+  sku_code: string;
+  name?: string | null;
+  qty_cases: number;
+  charged_cases: number;
+  free_cases: number;
+  price_per_case: string | number;
+  discount_amount: string | number;
+  line_total: string | number;
+  original_words?: string | null;
+  unit?: string | null;
+}
+
+export interface OrderResponse {
+  id: number;
+  retailer_id: number;
+  retailer_name: string;
+  status: 'pending' | 'credit_hold' | 'approved';
+  source: string;
+  total: string | number;
+  client_request_id?: string | null;
+  lines?: OrderResponseLine[];
+}

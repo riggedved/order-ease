@@ -27,6 +27,67 @@ export function formatINR(val: number | string | null | undefined): string {
 }
 
 /**
+ * Strips trailing ", case of N" suffix from product name.
+ * e.g., "Glucose biscuit 75 g, case of 96" -> "Glucose biscuit 75 g"
+ */
+export function cleanProductName(name: string): string {
+  if (!name) return '';
+  return name.replace(/,?\s*case of \d+/i, '').trim();
+}
+
+/**
+ * Capitalizes the starting letter of each word in a string.
+ * e.g., "add 5 more for 1 free" -> "Add 5 More For 1 Free"
+ */
+export function formatTitleCase(str: string): string {
+  if (!str) return '';
+  return str.replace(/\b[a-z]/g, (char) => char.toUpperCase());
+}
+
+/**
+ * Maps SKU code to flat SVG pack illustration in /products/
+ */
+export function getProductImage(code: string): string {
+  switch (code) {
+    case 'SKU-BS-075':
+      return '/products/biscuit-75g.svg';
+    case 'SKU-BS-150':
+      return '/products/biscuit-150g.svg';
+    case 'SKU-DT-1KG':
+      return '/products/detergent-1kg.svg';
+    case 'SKU-DT-500':
+      return '/products/detergent-500g.svg';
+    case 'SKU-TE-250':
+      return '/products/tea-250g.svg';
+    case 'SKU-TE-100':
+      return '/products/tea-100g.svg';
+    default:
+      return '/products/placeholder.svg';
+  }
+}
+
+/**
+ * Returns exact scheme badge text:
+ * "Buy 10 cases, get 1 free" and "3% off on 5+ cases"
+ */
+export function getSchemeBadgeText(sku: CatalogueSKU, lang: Language): string | null {
+  const code = (sku.code || '').toUpperCase();
+  const label = (sku.scheme_label || '').toLowerCase();
+
+  // Biscuit 75g or free goods scheme
+  if (code === 'SKU-BS-075' || label.includes('free') || label.includes('10')) {
+    return lang === 'hi' ? '10 केस खरीदने पर 1 मुफ़्त' : 'Buy 10 cases, get 1 free';
+  }
+
+  // Detergent 1kg or slab discount scheme
+  if (code === 'SKU-DT-1KG' || label.includes('3%') || label.includes('5')) {
+    return lang === 'hi' ? '5+ केस पर 3% छूट' : '3% off on 5+ cases';
+  }
+
+  return sku.scheme_label || null;
+}
+
+/**
  * Derives product category from SKU name / code dynamically.
  */
 export function getProductCategory(sku: CatalogueSKU): string {

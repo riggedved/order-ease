@@ -43,6 +43,14 @@ def init_db(engine_to_use=engine) -> None:
             if "exported_at" not in cols:
                 conn.execute(text("ALTER TABLE orders ADD COLUMN exported_at TIMESTAMP"))
                 conn.commit()
+            res_lines = conn.execute(text("PRAGMA table_info(order_lines)")).fetchall()
+            cols_lines = [r[1] for r in res_lines]
+            if "original_words" not in cols_lines:
+                conn.execute(text("ALTER TABLE order_lines ADD COLUMN original_words VARCHAR"))
+                conn.commit()
+            if "unit" not in cols_lines:
+                conn.execute(text("ALTER TABLE order_lines ADD COLUMN unit VARCHAR DEFAULT 'case'"))
+                conn.commit()
         except Exception:
             pass
     with Session(engine_to_use) as session:

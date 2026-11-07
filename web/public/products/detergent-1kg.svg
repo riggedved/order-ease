@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 150" width="200" height="150">
+  <rect width="200" height="150" fill="#F8FAFC" rx="10"/>
+  <!-- Detergent 1kg Standup Pouch (larger, centered, 4:3) -->
+  <!-- Top heat-seal banner -->
+  <rect x="52" y="10" width="96" height="15" rx="3" fill="#1D4ED8" stroke="#1E40AF" stroke-width="2"/>
+  <rect x="76" y="14" width="48" height="6" rx="3" fill="#DBEAFE"/>
+  <!-- Pouch body -->
+  <path d="M56 25 L144 25 L158 138 Q100 144 42 138 Z" fill="#2563EB" stroke="#1D4ED8" stroke-width="2.5"/>
+  <path d="M62 30 L138 30 L150 133 Q100 139 50 133 Z" fill="#3B82F6"/>
+  <!-- Decorative bubbles -->
+  <circle cx="78" cy="68" r="15" fill="#93C5FD" opacity="0.8"/>
+  <circle cx="118" cy="58" r="11" fill="#BFDBFE" opacity="0.9"/>
+  <circle cx="114" cy="88" r="13" fill="#93C5FD" opacity="0.75"/>
+  <circle cx="74" cy="98" r="9" fill="#BFDBFE" opacity="0.85"/>
+  <circle cx="95" cy="80" r="6" fill="#DBEAFE" opacity="0.95"/>
+  <!-- Sparkles -->
+  <path d="M98 42 L101 50 L109 52 L101 54 L98 62 L95 54 L87 52 L95 50 Z" fill="#FFFFFF"/>
+  <path d="M136 94 L138 99 L143 100 L138 101 L136 106 L134 101 L129 100 L134 99 Z" fill="#FFFFFF"/>
+</svg>

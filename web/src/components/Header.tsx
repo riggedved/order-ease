@@ -42,17 +42,42 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right Side: Language Toggle & Menu */}
         <div className="flex items-center space-x-2 shrink-0">
-          {/* EN / हिं Language Switch Button */}
-          <button
-            type="button"
-            onClick={onToggleLang}
-            className="min-tap px-3 py-1.5 border border-border rounded-xl text-xs font-semibold flex items-center justify-center text-ink hover:bg-gray-50 focus:outline-none transition-colors"
-            aria-label={`Toggle language to ${lang === 'en' ? 'Hindi' : 'English'}`}
+          {/* Two-part segmented Language Switch "EN | हिं" on one line: identical size & weight */}
+          <div
+            className="border border-border rounded-xl p-0.5 inline-flex items-center bg-white h-9 select-none shrink-0"
+            role="group"
+            aria-label="Language selector"
           >
-            <span className="font-bold">
-              {lang === 'en' ? 'हिं' : 'EN'}
-            </span>
-          </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (lang !== 'en') onToggleLang();
+              }}
+              className={`w-9 h-7 flex items-center justify-center text-xs font-bold rounded-lg transition-colors ${
+                lang === 'en'
+                  ? 'bg-primary text-white'
+                  : 'text-ink-muted hover:text-ink bg-transparent'
+              }`}
+              aria-pressed={lang === 'en'}
+            >
+              EN
+            </button>
+            <span className="text-border px-0.5 text-xs select-none">|</span>
+            <button
+              type="button"
+              onClick={() => {
+                if (lang !== 'hi') onToggleLang();
+              }}
+              className={`w-9 h-7 flex items-center justify-center text-xs font-bold rounded-lg transition-colors ${
+                lang === 'hi'
+                  ? 'bg-primary text-white'
+                  : 'text-ink-muted hover:text-ink bg-transparent'
+              }`}
+              aria-pressed={lang === 'hi'}
+            >
+              हिं
+            </button>
+          </div>
 
           {/* Menu Button (when logged in or general) */}
           {user && (

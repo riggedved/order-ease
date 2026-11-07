@@ -4,9 +4,13 @@ import { translations } from '../i18n';
 import type { CatalogueSKU, CartQuoteResponse } from '../types';
 import {
   formatINR,
+  formatTitleCase,
+  cleanProductName,
   deriveCategoriesFromCatalogue,
   getProductCategory,
   getCategoryLabel,
+  getProductImage,
+  getSchemeBadgeText,
 } from '../utils';
 
 interface CatalogueScreenProps {
@@ -18,6 +22,7 @@ interface CatalogueScreenProps {
   cartQuantities: Record<string, number>;
   onUpdateQty: (skuCode: string, qty: number) => void;
   onViewCart: () => void;
+  onOpenOrderByMessage: () => void;
   quote: CartQuoteResponse | null;
 }
 
@@ -30,12 +35,30 @@ export const CatalogueScreen: React.FC<CatalogueScreenProps> = ({
   cartQuantities,
   onUpdateQty,
   onViewCart,
+  onOpenOrderByMessage,
   quote,
 }) => {
   const t = translations[lang];
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
+
+  // Interactive inline quantity editing
+  const [editingSku, setEditingSku] = useState<string | null>(null);
+  const [editingQty, setEditingQty] = useState<string>('');
+
+  const handleStartEditing = (skuCode: string, currentQty: number) => {
+    setEditingSku(skuCode);
+    setEditingQty(currentQty.toString());
+  };
+
+  const handleFinishEditing = (skuCode: string) => {
+    const val = parseInt(editingQty, 10);
+    if (!isNaN(val) && val >= 0) {
+      onUpdateQty(skuCode, val);
+    }
+    setEditingSku(null);
+  };
 
   // Derive categories dynamically from catalogue items
   const categories = useMemo(() => {
@@ -132,8 +155,30 @@ export const CatalogueScreen: React.FC<CatalogueScreenProps> = ({
   }
 
   return (
-    <div className="flex flex-col flex-1 p-4 pb-28 bg-surface">
-      {/* 1. Search Bar */}
+    <div className="flex flex-col flex-1 p-3.5 pb-36 bg-surface">
+      {/* 1. Order by Message Bar */}
+      <button
+        type="button"
+        onClick={onOpenOrderByMessage}
+        className="w-full min-tap h-12 px-4 border border-primary rounded-xl bg-white flex items-center justify-center space-x-2 text-primary font-bold text-sm hover:bg-primary-50 active:bg-primary-50 focus:outline-none transition-colors mb-3 select-none"
+      >
+        <svg
+          className="w-5 h-5 shrink-0 text-primary"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+          />
+        </svg>
+        <span>{t.order_by_message}</span>
+      </button>
+
+      {/* 2. Search Bar: 44-48px tall */}
       <div className="relative mb-3">
         <input
           id="product-search"
@@ -141,7 +186,7 @@ export const CatalogueScreen: React.FC<CatalogueScreenProps> = ({
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder={t.search_placeholder}
-          className="w-full min-tap pl-10 pr-4 py-2.5 text-sm bg-white border border-border rounded-xl text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none transition-colors"
+          className="w-full min-h-[44px] h-12 pl-10 pr-4 text-sm bg-white border border-border rounded-xl text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none transition-colors"
         />
         <span className="absolute left-3.5 top-3.5 text-ink-muted pointer-events-none">
           <svg
@@ -170,8 +215,8 @@ export const CatalogueScreen: React.FC<CatalogueScreenProps> = ({
         )}
       </div>
 
-      {/* 2. Category Filter Pills */}
-      <div className="flex space-x-2 overflow-x-auto no-scrollbar pb-2 mb-4">
+      {/* 3. Category Filter Chips: 44-48px tall */}
+      <div className="flex space-x-2 overflow-x-auto no-scrollbar pb-2 mb-3.5">
         {categories.map((cat) => {
           const isSelected = selectedCategory === cat;
           return (
@@ -179,7 +224,7 @@ export const CatalogueScreen: React.FC<CatalogueScreenProps> = ({
               key={cat}
               type="button"
               onClick={() => setSelectedCategory(cat)}
-              className={`min-tap px-4 py-2 rounded-xl text-xs font-semibold border flex items-center justify-center whitespace-nowrap transition-colors select-none ${
+              className={`min-h-[44px] h-[46px] px-4 rounded-xl text-xs font-semibold border flex items-center justify-center whitespace-nowrap transition-colors select-none ${
                 isSelected
                   ? 'bg-primary text-white border-primary'
                   : 'bg-white text-ink border-border hover:bg-gray-50'
@@ -191,7 +236,7 @@ export const CatalogueScreen: React.FC<CatalogueScreenProps> = ({
         })}
       </div>
 
-      {/* 3. Empty Search Results */}
+      {/* 4. Empty Search Results */}
       {filteredProducts.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <div className="w-14 h-14 rounded-2xl bg-gray-50 border border-border flex items-center justify-center text-ink-muted mb-3">
@@ -217,114 +262,166 @@ export const CatalogueScreen: React.FC<CatalogueScreenProps> = ({
           </p>
         </div>
       ) : (
-        /* 4. Product List / Cards */
-        <div className="flex flex-col space-y-3">
+        /* 5. 2-Column Product Grid (12px gap, equal height cards) */
+        <div className="grid grid-cols-2 gap-3 items-stretch">
           {filteredProducts.map((sku) => {
             const currentQty = cartQuantities[sku.code] || 0;
             const isOutOfStock = sku.stock_status === 'out';
             const isLowStock = sku.stock_status === 'low';
+            const schemeBadge = getSchemeBadgeText(sku, lang);
+
+            // Match quote line for scheme result or nudge from POST /cart/quote
+            const ql = quote?.lines?.find((l) => l.sku_code === sku.code);
+
+            let quoteLineMsg: string | null = null;
+            if (currentQty > 0 && ql) {
+              if (ql.free_cases > 0) {
+                quoteLineMsg =
+                  ql.free_cases === 1
+                    ? (lang === 'hi' ? '1 मुफ़्त केस जोड़ा गया' : '1 free case added')
+                    : (lang === 'hi' ? `${ql.free_cases} मुफ़्त केस जोड़े गए` : `${ql.free_cases} free cases added`);
+              } else if (parseFloat(ql.discount?.toString() || '0') > 0) {
+                quoteLineMsg = `${formatINR(ql.discount)} ${t.discount_applied}`;
+              } else if (ql.nudges && ql.nudges.length > 0) {
+                quoteLineMsg = formatTitleCase(ql.nudges[0]);
+              } else if (ql.warnings && ql.warnings.length > 0) {
+                quoteLineMsg = ql.warnings[0];
+              }
+            }
 
             return (
               <div
                 key={sku.code}
-                className="p-3.5 bg-white border border-border rounded-xl flex flex-col space-y-2.5 transition-colors"
+                className="bg-white border border-border rounded-xl flex flex-col h-full overflow-hidden transition-colors"
               >
-                {/* Header: Title & Stock Status */}
-                <div className="flex justify-between items-start gap-2">
-                  <div className="flex-1 min-w-0">
-                    <h2 className="text-sm font-bold text-ink leading-snug">
-                      {sku.name}
-                    </h2>
-                    <span className="text-[11px] text-ink-muted block mt-0.5">
-                      {sku.code}
-                    </span>
-                  </div>
-
-                  {/* Stock Status Chip (Never show a number!) */}
-                  {isOutOfStock && (
-                    <span className="px-2 py-0.5 rounded-lg border border-error text-error text-[11px] font-semibold shrink-0 bg-error-bg/10">
-                      {t.out_of_stock}
-                    </span>
-                  )}
+                {/* 3. 4:3 Image Area on Top (No text in SVG, larger centered pack) */}
+                <div className="aspect-[4/3] relative w-full bg-gray-50 flex items-center justify-center p-2 overflow-hidden shrink-0">
+                  {/* Low Stock Badge */}
                   {isLowStock && (
-                    <span className="px-2 py-0.5 rounded-lg border border-warning text-warning text-[11px] font-semibold shrink-0 bg-warning-bg/10">
+                    <span className="absolute top-2 right-2 z-10 px-2 py-0.5 rounded-full text-[10px] font-bold bg-warning-bg border border-warning/40 text-warning select-none">
                       {t.few_left}
                     </span>
                   )}
+
+                  {/* Lazy-loaded Flat Pack SVG Illustration */}
+                  <img
+                    src={getProductImage(sku.code)}
+                    alt={cleanProductName(sku.name)}
+                    loading="lazy"
+                    className="w-full h-full object-contain"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = '/products/placeholder.svg';
+                    }}
+                  />
                 </div>
 
-                {/* Scheme Badge (if applicable) */}
-                {sku.scheme_label && (
-                  <div className="flex items-center gap-1.5 self-start px-2 py-1 rounded-lg bg-primary-50 border border-primary/20 text-primary text-xs font-semibold">
-                    <svg
-                      className="w-3.5 h-3.5 text-primary shrink-0"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V4a2 2 0 10-2 2h2m0 13l4-4m-4 4l-4-4"
-                      />
-                    </svg>
-                    <span>{sku.scheme_label}</span>
-                  </div>
-                )}
-
-                {/* Price Matrix & Add / Stepper Actions */}
-                <div className="flex items-end justify-between pt-1 gap-2">
-                  {/* Price breakdown */}
+                {/* Details & Controls */}
+                <div className="p-2.5 flex flex-col flex-1 justify-between">
                   <div className="flex flex-col">
-                    <span className="text-base font-bold text-ink leading-tight">
-                      {formatINR(sku.case_price)} / {t.per_case}
-                    </span>
-                    <span className="text-xs text-ink-muted leading-tight mt-0.5">
-                      ({formatINR(sku.price_per_piece)} × {sku.units_per_case} ·{' '}
-                      {sku.price_includes_gst ? t.incl_gst : t.excl_gst})
-                    </span>
+                    {/* 1. Product Name without trailing ", case of N" */}
+                    <h2 className="text-xs font-bold text-ink leading-snug line-clamp-2 min-h-[32px] break-words">
+                      {cleanProductName(sku.name)}
+                    </h2>
+
+                    {/* 1. "Case of N" once, as a small grey line under the name */}
+                    <p className="text-[12px] text-ink-muted mt-0.5 leading-tight">
+                      {lang === 'hi' ? `${sku.units_per_case} का केस` : `Case of ${sku.units_per_case}`}
+                    </p>
+
+                    {/* 2. Scheme badge: between case line and price (#E8F5E9 fill, #0C6B1A text, 13px semibold, rounded 8px) */}
+                    {schemeBadge && (
+                      <div className="mt-2 mb-1 px-2.5 py-1 rounded-[8px] bg-[#E8F5E9] text-[#0C6B1A] text-[13px] font-semibold leading-tight line-clamp-2 inline-block w-fit max-w-full break-words">
+                        {schemeBadge}
+                      </div>
+                    )}
+
+                    {/* 4. Price: "₹777.60 / case" at 18px bold, "+ GST" (or "incl. GST") at 13px in #374151, "₹8.10 per piece × 96" at 13px in #6B7280 */}
+                    <div className="mt-2">
+                      <div className="flex flex-wrap items-baseline gap-x-1.5 leading-tight">
+                        <span className="text-[18px] font-bold text-ink">
+                          {formatINR(sku.case_price)} / {lang === 'hi' ? 'केस' : 'case'}
+                        </span>
+                        <span className="text-[13px] text-[#374151] font-normal whitespace-nowrap">
+                          {sku.price_includes_gst
+                            ? (lang === 'hi' ? 'जीएसटी सहित' : 'incl. GST')
+                            : (lang === 'hi' ? '+ जीएसटी' : '+ GST')}
+                        </span>
+                      </div>
+                      <p className="text-[13px] text-[#6B7280] mt-0.5 leading-tight">
+                        {formatINR(sku.price_per_piece)} {lang === 'hi' ? 'प्रति पीस' : 'per piece'} × {sku.units_per_case}
+                      </p>
+                    </div>
                   </div>
 
-                  {/* Quantity Stepper or Add Button */}
-                  <div className="shrink-0">
+                  {/* 5. Control Area pinned at bottom so buttons in the row line up */}
+                  <div className="mt-auto pt-3">
+                    {/* Out of Stock: greyed label, no button */}
                     {isOutOfStock ? (
-                      <button
-                        type="button"
-                        disabled
-                        className="min-tap px-4 h-11 rounded-xl bg-gray-100 text-ink-muted border border-border text-xs font-semibold cursor-not-allowed select-none"
-                      >
+                      <div className="w-full min-h-[48px] h-12 rounded-xl bg-gray-100 text-ink-muted text-xs font-semibold flex items-center justify-center select-none">
                         {t.out_of_stock}
-                      </button>
+                      </div>
                     ) : currentQty === 0 ? (
+                      /* Not in cart: outlined green "ADD", min 48px tall */
                       <button
                         type="button"
                         onClick={() => onUpdateQty(sku.code, 1)}
-                        className="min-tap px-5 h-11 rounded-xl bg-primary text-white font-bold text-xs flex items-center justify-center hover:bg-primary-dark active:bg-primary-dark transition-colors select-none"
+                        className="w-full min-h-[48px] h-12 rounded-xl border-2 border-primary bg-white text-primary font-bold text-xs flex items-center justify-center hover:bg-primary-50 active:bg-primary-50 transition-colors select-none"
                       >
                         {t.add}
                       </button>
                     ) : (
-                      <div className="flex items-center border border-primary rounded-xl h-11 bg-white">
+                      /* In cart: filled green stepper "- 5 cases +", min 48px tall */
+                      <div className="w-full min-h-[48px] h-12 rounded-xl bg-primary text-white font-bold flex items-center justify-between px-1 select-none">
                         <button
                           type="button"
                           onClick={() => onUpdateQty(sku.code, Math.max(0, currentQty - 1))}
-                          className="min-tap w-11 h-11 flex items-center justify-center text-primary text-xl font-bold hover:bg-gray-50 rounded-l-xl transition-colors select-none focus:outline-none"
+                          className="w-9 h-10 flex items-center justify-center text-white text-xl font-bold hover:bg-primary-dark active:bg-primary-dark rounded-lg transition-colors focus:outline-none"
                           aria-label={`Decrease ${sku.name}`}
                         >
                           −
                         </button>
-                        <span className="px-2 min-w-[48px] text-center text-xs font-bold text-ink select-none">
-                          {currentQty} {t.cases}
-                        </span>
+
+                        {/* Tapping number opens numeric input */}
+                        {editingSku === sku.code ? (
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            min="0"
+                            autoFocus
+                            value={editingQty}
+                            onChange={(e) => setEditingQty(e.target.value)}
+                            onBlur={() => handleFinishEditing(sku.code)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleFinishEditing(sku.code);
+                            }}
+                            className="w-12 h-8 bg-white text-ink font-bold text-center text-xs rounded outline-none border border-primary-dark"
+                          />
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleStartEditing(sku.code, currentQty)}
+                            className="flex-1 min-w-0 text-center text-xs font-bold text-white px-1 py-1 truncate hover:underline"
+                            title="Tap to type quantity"
+                          >
+                            {currentQty} {t.cases}
+                          </button>
+                        )}
+
                         <button
                           type="button"
                           onClick={() => onUpdateQty(sku.code, currentQty + 1)}
-                          className="min-tap w-11 h-11 flex items-center justify-center text-primary text-xl font-bold hover:bg-gray-50 rounded-r-xl transition-colors select-none focus:outline-none"
+                          className="w-9 h-10 flex items-center justify-center text-white text-xl font-bold hover:bg-primary-dark active:bg-primary-dark rounded-lg transition-colors focus:outline-none"
                           aria-label={`Increase ${sku.name}`}
                         >
                           +
                         </button>
+                      </div>
+                    )}
+
+                    {/* Under the control: scheme result or nudge from POST /cart/quote */}
+                    {currentQty > 0 && quoteLineMsg && (
+                      <div className="mt-1.5 text-[11px] font-semibold text-primary leading-tight text-center line-clamp-2 break-words">
+                        {quoteLineMsg}
                       </div>
                     )}
                   </div>
@@ -335,16 +432,22 @@ export const CatalogueScreen: React.FC<CatalogueScreenProps> = ({
         </div>
       )}
 
-      {/* 5. Sticky Bottom Cart Bar (shows only when cart has items) */}
+      {/* 6. Sticky Bottom Cart Bar */}
+      {/* Requirement: show "20 cases" and the payable, with the label "incl. GST" next to the amount */}
       {totalCasesInCart > 0 && (
         <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[420px] bg-primary text-white p-3 z-40 border-t border-primary-dark flex items-center justify-between select-none">
           <div className="flex flex-col">
             <span className="text-xs uppercase tracking-wider text-green-100 font-medium">
               {totalCasesInCart} {t.cases}
             </span>
-            <span className="text-base font-bold">
-              {formatINR(quote?.payable)}
-            </span>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-base font-bold">
+                {formatINR(quote?.payable)}
+              </span>
+              <span className="text-[11px] font-normal text-green-100">
+                {t.incl_gst}
+              </span>
+            </div>
           </div>
 
           <button

@@ -413,7 +413,6 @@ def evaluate_scheme(
         next_free_tier = ((charged_qty // rule_free_ratio) + 1) * rule_free_ratio
         cases_to_free = next_free_tier - charged_qty
         nudges.append(f"add {cases_to_free} more for 1 free")
-        nudges.append(f"Add {cases_to_free} more cases to get 1 free")
 
     if (
         rule_slab_threshold is not None
@@ -424,7 +423,6 @@ def evaluate_scheme(
             cases_to_slab = rule_slab_threshold - charged_qty
             pct_int = int(rule_slab_discount * 100)
             nudges.append(f"add {cases_to_slab} more for {pct_int}% off")
-            nudges.append(f"Add {cases_to_slab} more cases to get {pct_int}% off")
 
     primary_nudge = nudges[0] if nudges else None
 

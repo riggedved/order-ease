@@ -4,6 +4,9 @@ import type {
   CatalogueSKU,
   CartQuoteResponse,
   CartQuoteLineRequest,
+  CaptureResponse,
+  OrderCreatePayload,
+  OrderResponse,
 } from './types';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
@@ -89,5 +92,29 @@ export async function fetchCartQuote(
       retailer_id: retailerId,
       lines,
     }),
+  }, token);
+}
+
+export async function captureOrder(
+  retailerId: number,
+  text: string,
+  token: string
+): Promise<CaptureResponse> {
+  return request<CaptureResponse>('/capture', {
+    method: 'POST',
+    body: JSON.stringify({
+      retailer_id: retailerId,
+      text,
+    }),
+  }, token);
+}
+
+export async function createOrder(
+  payload: OrderCreatePayload,
+  token: string
+): Promise<OrderResponse> {
+  return request<OrderResponse>('/orders', {
+    method: 'POST',
+    body: JSON.stringify(payload),
   }, token);
 }

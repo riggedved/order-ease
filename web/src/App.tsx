@@ -3,6 +3,7 @@ import { Header } from './components/Header';
 import { LoginScreen } from './components/LoginScreen';
 import { CatalogueScreen } from './components/CatalogueScreen';
 import { CartView } from './components/CartView';
+import { OrderByMessage } from './components/OrderByMessage';
 import type { Language } from './i18n';
 import type {
   UserMe,
@@ -44,8 +45,8 @@ export function App() {
     return null;
   });
 
-  // 3. Navigation View State
-  const [currentView, setCurrentView] = useState<'catalogue' | 'cart'>('catalogue');
+  // 3. Navigation View State: 'catalogue' | 'cart' | 'order_by_message'
+  const [currentView, setCurrentView] = useState<'catalogue' | 'cart' | 'order_by_message'>('catalogue');
 
   // 4. Catalogue State
   const [catalogue, setCatalogue] = useState<CatalogueSKU[]>([]);
@@ -57,6 +58,9 @@ export function App() {
   const [quote, setQuote] = useState<CartQuoteResponse | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const debounceTimerRef = useRef<any>(null);
+
+  // 6. Order by message draft text (persists when navigating back to catalogue and returning)
+  const [orderMessageDraft, setOrderMessageDraft] = useState('');
 
   // Sync token / user state
   const handleLoginSuccess = (tokenData: TokenResponse) => {
@@ -80,6 +84,7 @@ export function App() {
     setUser(null);
     setCartQuantities({});
     setQuote(null);
+    setOrderMessageDraft('');
     setCurrentView('catalogue');
     localStorage.removeItem('orderease_token');
     localStorage.removeItem('orderease_user');
@@ -174,6 +179,19 @@ export function App() {
     });
   };
 
+  // Bulk add items from OrderByMessage into Cart
+  const handleAddCapturedItemsToCart = (items: { sku_code: string; qty: number }[]) => {
+    setCartQuantities((prev) => {
+      const updated = { ...prev };
+      for (const item of items) {
+        updated[item.sku_code] = (updated[item.sku_code] || 0) + item.qty;
+      }
+      triggerDebouncedQuote(updated);
+      return updated;
+    });
+    setCurrentView('cart');
+  };
+
   return (
     <div className="w-full min-h-screen bg-white flex justify-center">
       {/* 420px mobile frame on desktop, 360px+ first */}
@@ -200,9 +218,10 @@ export function App() {
               cartQuantities={cartQuantities}
               onUpdateQty={handleUpdateQty}
               onViewCart={() => setCurrentView('cart')}
+              onOpenOrderByMessage={() => setCurrentView('order_by_message')}
               quote={quote}
             />
-          ) : (
+          ) : currentView === 'cart' ? (
             <CartView
               lang={lang}
               quote={quote}
@@ -210,6 +229,17 @@ export function App() {
               catalogue={catalogue}
               onUpdateQty={handleUpdateQty}
               onBackToCatalogue={() => setCurrentView('catalogue')}
+            />
+          ) : (
+            <OrderByMessage
+              lang={lang}
+              retailerId={user.retailer_id!}
+              token={token}
+              catalogue={catalogue}
+              draftText={orderMessageDraft}
+              onDraftChange={setOrderMessageDraft}
+              onBackToCatalogue={() => setCurrentView('catalogue')}
+              onAddToCart={handleAddCapturedItemsToCart}
             />
           )}
         </main>

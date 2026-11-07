@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 150" width="200" height="150">
+  <rect width="200" height="150" fill="#F3F4F6" rx="10"/>
+  <!-- Neutral placeholder box (larger, centered, 4:3) -->
+  <rect x="45" y="25" width="110" height="100" rx="8" fill="#E5E7EB" stroke="#D1D5DB" stroke-width="2.5"/>
+  <circle cx="82" cy="56" r="7" fill="#9CA3AF"/>
+  <path d="M62 98 L82 74 L98 90 L112 78 L138 98 Z" fill="#9CA3AF" opacity="0.8"/>
+</svg>
