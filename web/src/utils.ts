@@ -45,6 +45,33 @@ export function formatTitleCase(str: string): string {
 }
 
 /**
+ * Formats a string to sentence case.
+ * e.g., "add 5 more cases to get 1 free" -> "Add 5 more cases to get 1 free"
+ */
+export function toSentenceCase(str: string): string {
+  if (!str) return '';
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+/**
+ * Extracts pack size from product name or code.
+ * e.g., "Glucose biscuit 75 g, case of 96" -> "75 g"
+ * e.g., "Detergent powder 1 kg, case of 20" -> "1 kg"
+ */
+export function getPackSize(sku: CatalogueSKU | null | undefined): string {
+  if (!sku) return '';
+  const match = sku.name.match(/\b(\d+(?:\.\d+)?\s*(?:g|kg|ml|l|gm))\b/i);
+  if (match) return match[1];
+  if (sku.code.includes('-075')) return '75 g';
+  if (sku.code.includes('-150')) return '150 g';
+  if (sku.code.includes('-1KG')) return '1 kg';
+  if (sku.code.includes('-500')) return '500 g';
+  if (sku.code.includes('-250')) return '250 g';
+  if (sku.code.includes('-100')) return '100 g';
+  return cleanProductName(sku.name);
+}
+
+/**
  * Maps SKU code to flat SVG pack illustration in /products/
  */
 export function getProductImage(code: string): string {

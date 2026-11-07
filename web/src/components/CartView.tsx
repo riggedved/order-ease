@@ -2,7 +2,7 @@ import React from 'react';
 import type { Language } from '../i18n';
 import { translations } from '../i18n';
 import type { CartQuoteResponse, CatalogueSKU } from '../types';
-import { formatINR, formatTitleCase } from '../utils';
+import { formatINR, formatTitleCase, cleanProductName, getProductImage } from '../utils';
 
 interface CartViewProps {
   lang: Language;
@@ -163,20 +163,31 @@ export const CartView: React.FC<CartViewProps> = ({
                 isBlocked ? 'opacity-85' : ''
               }`}
             >
-              {/* Line Header: Product Name & Breakdown */}
-              <div className="flex justify-between items-start gap-2">
-                <div className="flex flex-col min-w-0 flex-1">
-                  <h2 className="text-sm font-semibold text-ink leading-tight">
-                    {line.name}
-                  </h2>
-                  <div className="text-xs text-ink-muted mt-0.5">
-                    {formatINR(line.case_price)} / {t.per_case}{' '}
-                    {sku && (
-                      <span>
-                        ({formatINR(sku.price_per_piece)} × {sku.units_per_case} ·{' '}
-                        {sku.price_includes_gst ? t.incl_gst : t.excl_gst})
-                      </span>
-                    )}
+              {/* Line Header: Thumbnail, Product Name & Breakdown */}
+              <div className="flex justify-between items-start gap-3">
+                <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                  <img
+                    src={getProductImage(line.sku_code)}
+                    alt={cleanProductName(line.name)}
+                    loading="lazy"
+                    className="w-12 h-12 rounded-lg bg-gray-50 object-contain p-1 border border-border shrink-0"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = '/products/placeholder.svg';
+                    }}
+                  />
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <h2 className="text-sm font-semibold text-ink leading-tight">
+                      {cleanProductName(line.name)}
+                    </h2>
+                    <div className="text-xs text-ink-muted mt-0.5">
+                      {formatINR(line.case_price)} / {t.per_case}{' '}
+                      {sku && (
+                        <span>
+                          ({formatINR(sku.price_per_piece)} × {sku.units_per_case} ·{' '}
+                          {sku.price_includes_gst ? t.incl_gst : t.excl_gst})
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 

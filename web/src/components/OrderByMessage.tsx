@@ -8,7 +8,13 @@ import type {
   CartQuoteLineResponse,
 } from '../types';
 import { captureOrder, createOrder, fetchCartQuote, ApiError } from '../api';
-import { formatINR, formatTitleCase } from '../utils';
+import {
+  formatINR,
+  cleanProductName,
+  getProductImage,
+  getPackSize,
+  toSentenceCase,
+} from '../utils';
 
 interface OrderByMessageProps {
   lang: Language;
@@ -82,10 +88,28 @@ export const OrderByMessage: React.FC<OrderByMessageProps> = ({
     setError(null);
   };
 
+  // Remove a parsed line
+  const handleRemoveLine = (index: number) => {
+    const updated = editableLines.filter((_, i) => i !== index);
+    setEditableLines(updated);
+    refreshQuote(updated);
+  };
+
   // Recalculate quote whenever user adjusts quantities or units
   const refreshQuote = async (linesToQuote: ParsedLine[]) => {
     const validLines = linesToQuote
-      .filter((l) => l.sku_code && l.unit === 'case' && (l.qty || 0) > 0 && !l.flags.includes('out_of_stock'))
+      .filter((l) => {
+        const skuInfo = getSku(l.sku_code);
+        return (
+          l.sku_code &&
+          l.unit === 'case' &&
+          (l.qty || 0) > 0 &&
+          !l.flags.includes('out_of_stock') &&
+          !l.flags.includes('needs_unit') &&
+          !l.flags.includes('no_match') &&
+          skuInfo?.stock_status !== 'out'
+        );
+      })
       .map((l) => ({
         sku_code: l.sku_code!,
         qty_cases: l.qty || 1,
@@ -148,7 +172,7 @@ export const OrderByMessage: React.FC<OrderByMessageProps> = ({
   // Line adjustment handlers
   const handleUpdateLineQty = (index: number, newQty: number) => {
     const updated = [...editableLines];
-    updated[index] = { ...updated[index], qty: Math.max(0, newQty) };
+    updated[index] = { ...updated[index], qty: Math.max(1, newQty) };
     setEditableLines(updated);
     refreshQuote(updated);
   };
@@ -164,14 +188,15 @@ export const OrderByMessage: React.FC<OrderByMessageProps> = ({
   const handleSelectAlternative = (index: number, altSkuCode: string) => {
     const updated = [...editableLines];
     const currentCode = updated[index].sku_code;
-    const newAlternatives = (updated[index].alternatives || [])
-      .filter((c) => c !== altSkuCode);
-    if (currentCode) {
+    const newAlternatives = (updated[index].alternatives || []).filter((c) => c !== altSkuCode);
+    if (currentCode && !newAlternatives.includes(currentCode)) {
       newAlternatives.push(currentCode);
     }
 
     const skuInfo = getSku(altSkuCode);
-    const newFlags = (updated[index].flags || []).filter((f) => f !== 'no_match');
+    const newFlags = (updated[index].flags || []).filter(
+      (f) => f !== 'no_match' && f !== 'out_of_stock'
+    );
     if (skuInfo && skuInfo.stock_status === 'out') {
       newFlags.push('out_of_stock');
     }
@@ -190,7 +215,18 @@ export const OrderByMessage: React.FC<OrderByMessageProps> = ({
   // Add parsed items to standard cart
   const handleAddAllToCart = () => {
     const items = editableLines
-      .filter((l) => l.sku_code && l.unit === 'case' && (l.qty || 0) > 0 && !l.flags.includes('out_of_stock'))
+      .filter((l) => {
+        const skuInfo = getSku(l.sku_code);
+        return (
+          l.sku_code &&
+          l.unit === 'case' &&
+          (l.qty || 0) > 0 &&
+          !l.flags.includes('out_of_stock') &&
+          !l.flags.includes('needs_unit') &&
+          !l.flags.includes('no_match') &&
+          skuInfo?.stock_status !== 'out'
+        );
+      })
       .map((l) => ({
         sku_code: l.sku_code!,
         qty: l.qty || 1,
@@ -201,26 +237,74 @@ export const OrderByMessage: React.FC<OrderByMessageProps> = ({
     }
   };
 
-  // Total free cases calculated from live quote
-  const totalFreeCases = useMemo(() => {
-    return quoteLines.reduce((acc, q) => acc + (q.free_cases || 0), 0);
-  }, [quoteLines]);
+  // Count of items included in quote/order
+  const validItemsCount = useMemo(() => {
+    return editableLines.filter((l) => {
+      const skuInfo = getSku(l.sku_code);
+      return (
+        l.sku_code &&
+        l.unit === 'case' &&
+        (l.qty || 0) > 0 &&
+        !l.flags.includes('out_of_stock') &&
+        !l.flags.includes('needs_unit') &&
+        !l.flags.includes('no_match') &&
+        skuInfo?.stock_status !== 'out'
+      );
+    }).length;
+  }, [editableLines, catalogue]);
+
+  const excludedCount = useMemo(() => {
+    return editableLines.filter((l) => {
+      const skuInfo = getSku(l.sku_code);
+      return (
+        l.flags.includes('out_of_stock') ||
+        skuInfo?.stock_status === 'out' ||
+        l.flags.includes('needs_unit') ||
+        l.unit === 'unknown' ||
+        !l.sku_code
+      );
+    }).length;
+  }, [editableLines, catalogue]);
+
+  const hasUnansweredQuestion = useMemo(() => {
+    return editableLines.some(
+      (l) => l.flags.includes('needs_unit') || l.flags.includes('no_match') || !l.sku_code || l.unit === 'unknown'
+    );
+  }, [editableLines]);
+
+  const isConfirmDisabled =
+    hasUnansweredQuestion || validItemsCount === 0 || quoteLoading || placingOrder;
 
   // Confirm order directly with source: retailer_capture
   const handleConfirmOrder = async () => {
     setOrderError(null);
 
     const validLines = editableLines
-      .filter((l) => l.sku_code && (l.qty || 0) > 0 && !l.flags.includes('out_of_stock'))
+      .filter((l) => {
+        const skuInfo = getSku(l.sku_code);
+        return (
+          l.sku_code &&
+          l.unit === 'case' &&
+          (l.qty || 0) > 0 &&
+          !l.flags.includes('out_of_stock') &&
+          !l.flags.includes('needs_unit') &&
+          !l.flags.includes('no_match') &&
+          skuInfo?.stock_status !== 'out'
+        );
+      })
       .map((l) => ({
         sku_code: l.sku_code!,
         qty_cases: l.qty || 1,
-        original_words: l.original_words,
+        original_words: l.original_words || null,
         unit: l.unit || 'case',
       }));
 
     if (validLines.length === 0) {
-      setOrderError('No valid items to order. Please ensure items are in stock.');
+      setOrderError(
+        lang === 'hi'
+          ? 'ऑर्डर करने के लिए कोई मान्य सामान नहीं है।'
+          : 'No valid items to order. Please ensure items are in stock.'
+      );
       return;
     }
 
@@ -238,7 +322,7 @@ export const OrderByMessage: React.FC<OrderByMessageProps> = ({
       setOrderSuccess(order);
     } catch (err: any) {
       if (err instanceof ApiError) {
-        setOrderError(`Order error: ${err.message}`);
+        setOrderError(err.message);
       } else {
         setOrderError(err.message || 'Could not place order. Please try again.');
       }
@@ -327,14 +411,14 @@ export const OrderByMessage: React.FC<OrderByMessageProps> = ({
             </div>
           )}
 
-          {/* 5. Under it, one grey line: "Example: 5 peti biscuit, 2 peti washing powder" with a "Try this example" link */}
+          {/* 5. Complete example before the try this example button */}
           <p className="text-xs text-ink-muted mt-2.5 leading-relaxed">
             <span>{t.example_preview_label} · </span>
             <button
               type="button"
               onClick={handleUseSample}
               disabled={loading}
-              className="text-primary font-semibold hover:underline focus:outline-none disabled:opacity-50"
+              className="text-primary font-semibold hover:underline focus:outline-none disabled:opacity-50 whitespace-nowrap"
             >
               {t.try_this_example}
             </button>
@@ -382,16 +466,16 @@ export const OrderByMessage: React.FC<OrderByMessageProps> = ({
 
       {/* ================= STEP 2: REVIEW PAGE ================= */}
       {step === 'review' && (
-        <div className="flex flex-col w-full">
-          {/* Top Header & Step Indicator */}
-          <div className="flex items-center justify-between pb-3 border-b border-border mb-3">
+        <div className="flex flex-col w-full pb-44">
+          {/* Back link */}
+          <div className="mb-2">
             <button
               type="button"
               onClick={() => {
                 setOrderError(null);
                 setStep('input');
               }}
-              className="min-tap -ml-2 px-2 flex items-center text-sm font-semibold text-ink hover:text-primary transition-colors focus:outline-none"
+              className="min-tap -ml-2 px-2 inline-flex items-center text-sm font-semibold text-ink hover:text-primary transition-colors focus:outline-none"
             >
               <svg
                 className="w-5 h-5 mr-1"
@@ -404,371 +488,26 @@ export const OrderByMessage: React.FC<OrderByMessageProps> = ({
               </svg>
               <span>{t.edit_text_btn}</span>
             </button>
-
-            <span className="text-xs font-bold text-primary px-2.5 py-1 rounded-full bg-primary-50 border border-primary/20">
-              {t.step_2_title}
-            </span>
           </div>
 
-          {/* Heading */}
+          {/* Heading & Subtitle */}
           <div className="mb-4">
             <h1 className="text-xl font-bold text-ink">
-              {t.step_2_title}
+              {t.review_title}
             </h1>
-            <p className="text-xs text-ink-muted mt-1">
-              {t.review_subtitle}
-            </p>
-          </div>
-
-          {/* Parsed Items List */}
-          <div className="space-y-3 mb-6">
-            {editableLines.map((line, idx) => {
-              const sku = getSku(line.sku_code);
-              const ql = quoteLines.find((q) => q.sku_code === line.sku_code);
-              const isOutOfStock = line.flags.includes('out_of_stock') || (sku && sku.stock_status === 'out');
-              const needsUnit = line.flags.includes('needs_unit') || line.unit === 'unknown';
-              const isNoMatch = line.flags.includes('no_match') || !line.sku_code;
-
-              return (
-                <div
-                  key={idx}
-                  className={`p-3.5 bg-white border rounded-xl flex flex-col space-y-2.5 transition-colors ${
-                    needsUnit
-                      ? 'border-primary ring-1 ring-primary'
-                      : isOutOfStock
-                      ? 'border-error/40 bg-error-bg/5'
-                      : 'border-border'
-                  }`}
-                >
-                  {/* Original Words & Match Badge Header */}
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="text-xs text-ink-muted font-serif italic truncate">
-                        "{line.original_words}"
-                      </span>
-                    </div>
-
-                    {/* Match Badge */}
-                    {isNoMatch ? (
-                      <span className="px-2 py-0.5 rounded-full border border-error/40 text-error text-[11px] font-semibold bg-error-bg/20 shrink-0">
-                        {t.no_match}
-                      </span>
-                    ) : needsUnit ? (
-                      <span className="px-2 py-0.5 rounded-full border border-primary text-primary text-[11px] font-bold bg-primary-50 shrink-0">
-                        {t.action_required}
-                      </span>
-                    ) : isOutOfStock ? (
-                      <span className="px-2 py-0.5 rounded-full border border-error/50 text-error text-[11px] font-semibold bg-error-bg/30 shrink-0">
-                        {t.out_of_stock}
-                      </span>
-                    ) : line.confidence === 'high' ? (
-                      <span className="px-2 py-0.5 rounded-full border border-primary/30 text-primary text-[11px] font-semibold bg-primary-50 shrink-0 flex items-center gap-1">
-                        <svg className="w-3 h-3 text-primary" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                        <span>{t.high_match}</span>
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 rounded-full border border-border text-ink-muted text-[11px] font-semibold bg-gray-50 shrink-0">
-                        {t.medium_match}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* SKU Name & Price Row */}
-                  <div className="pt-1 border-t border-border flex items-start justify-between gap-3">
-                    <div className="flex flex-col min-w-0 flex-1">
-                      <span
-                        className={`text-sm font-semibold leading-tight ${
-                          isOutOfStock ? 'text-ink-muted line-through' : 'text-ink'
-                        }`}
-                      >
-                        {sku?.name || (isNoMatch ? 'Item not found in catalog' : line.sku_code)}
-                      </span>
-                      {sku && (
-                        <span className="text-[11px] text-ink-muted mt-0.5">
-                          {sku.code} · {formatINR(sku.case_price)} / {t.per_case}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Line Total */}
-                    <div className="text-right shrink-0">
-                      {isOutOfStock ? (
-                        <span className="text-xs font-bold text-error block">
-                          {t.out_of_stock_tag}
-                        </span>
-                      ) : ql ? (
-                        <span className="text-sm font-bold text-ink block">
-                          {formatINR(ql.line_total)}
-                        </span>
-                      ) : (
-                        <span className="text-sm font-bold text-ink block">
-                          {line.qty || 1} {line.unit === 'case' ? t.cases : line.unit}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Free Goods Badge (from scheme evaluation) */}
-                  {ql && ql.free_cases > 0 && (
-                    <div className="flex items-center gap-1.5 text-primary text-xs font-bold pt-1">
-                      <svg
-                        className="w-4 h-4 text-primary shrink-0"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                        />
-                      </svg>
-                      <span>
-                        +{ql.free_cases}{' '}
-                        {ql.free_cases === 1
-                          ? t.free_cases_badge
-                          : t.free_cases_plural_badge}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Scheme Discount Badge */}
-                  {ql && parseFloat(ql.discount?.toString() || '0') > 0 && (
-                    <div className="flex items-center gap-1.5 text-primary text-xs font-semibold pt-0.5">
-                      <svg
-                        className="w-3.5 h-3.5 text-primary shrink-0"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
-                        />
-                      </svg>
-                      <span>
-                        {formatINR(ql.discount)} {t.discount_applied}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Nudges from server quote */}
-                  {ql && ql.nudges && ql.nudges.length > 0 && (
-                    <div className="space-y-1 pt-1">
-                      {Array.from(new Set(ql.nudges)).slice(0, 1).map((nudge, nIdx) => (
-                        <div
-                          key={nIdx}
-                          className="flex items-center gap-1.5 p-1.5 rounded-lg bg-primary-50 border border-primary/20 text-xs font-medium text-primary"
-                        >
-                          <svg
-                            className="w-3.5 h-3.5 text-primary shrink-0"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
-                            />
-                          </svg>
-                          <span className="capitalize">{formatTitleCase(nudge)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Unit Choice Option: If unit is unknown or needs_unit */}
-                  {needsUnit && (
-                    <div className="pt-2 border-t border-primary/20 space-y-1.5">
-                      <p className="text-xs font-bold text-primary flex items-center gap-1">
-                        <svg
-                          className="w-4 h-4 text-primary"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
-                          />
-                        </svg>
-                        <span>{t.cases_or_pieces}</span>
-                      </p>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleSelectUnit(idx, 'case')}
-                          className={`min-tap px-3 py-2.5 rounded-xl border text-xs font-bold flex items-center justify-center transition-colors ${
-                            line.unit === 'case'
-                              ? 'bg-primary text-white border-primary'
-                              : 'bg-white text-ink border-border hover:bg-gray-50'
-                          }`}
-                        >
-                          {t.cases_option.replace('{qty}', (line.qty || 1).toString())}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleSelectUnit(idx, 'piece')}
-                          className={`min-tap px-3 py-2.5 rounded-xl border text-xs font-bold flex items-center justify-center transition-colors ${
-                            line.unit === 'piece'
-                              ? 'bg-primary text-white border-primary'
-                              : 'bg-white text-ink border-border hover:bg-gray-50'
-                          }`}
-                        >
-                          {t.pieces_option.replace('{qty}', (line.qty || 1).toString())}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Quantity Stepper (if matched and in stock) */}
-                  {!isOutOfStock && !isNoMatch && (
-                    <div className="flex items-center justify-between pt-1">
-                      <div className="flex items-center border border-border rounded-xl h-10 bg-surface">
-                        <button
-                          type="button"
-                          onClick={() => handleUpdateLineQty(idx, (line.qty || 1) - 1)}
-                          className="min-tap w-10 h-10 flex items-center justify-center text-primary text-lg font-bold hover:bg-gray-50 rounded-l-xl transition-colors select-none focus:outline-none"
-                          aria-label="Decrease quantity"
-                        >
-                          −
-                        </button>
-                        <span className="px-2.5 min-w-[50px] text-center text-xs font-bold text-ink select-none">
-                          {line.qty || 1} {line.unit === 'case' ? t.cases : line.unit}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleUpdateLineQty(idx, (line.qty || 1) + 1)}
-                          className="min-tap w-10 h-10 flex items-center justify-center text-primary text-lg font-bold hover:bg-gray-50 rounded-r-xl transition-colors select-none focus:outline-none"
-                          aria-label="Increase quantity"
-                        >
-                          +
-                        </button>
-                      </div>
-
-                      <span className="text-[11px] font-semibold text-primary flex items-center gap-1">
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                        <span>{t.ready_to_pack}</span>
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Alternatives (Did you mean) */}
-                  {line.alternatives && line.alternatives.length > 0 && (
-                    <div className="pt-2 border-t border-border space-y-1.5">
-                      <span className="text-[11px] font-semibold text-ink-muted">
-                        {t.did_you_mean}
-                      </span>
-                      <div className="flex flex-col gap-1.5">
-                        {line.alternatives.map((altCode) => {
-                          const altSku = getSku(altCode);
-                          return (
-                            <button
-                              key={altCode}
-                              type="button"
-                              onClick={() => handleSelectAlternative(idx, altCode)}
-                              className="w-full min-tap p-2 rounded-lg border border-border bg-gray-50 hover:bg-primary-50 hover:border-primary text-left text-xs flex items-center justify-between transition-colors"
-                            >
-                              <span className="font-medium text-ink truncate mr-2">
-                                {altSku?.name || altCode}
-                              </span>
-                              {altSku && (
-                                <span className="font-bold text-primary shrink-0">
-                                  {formatINR(altSku.case_price)}
-                                </span>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Bottom Estimated Summary Card */}
-          <div className="p-4 bg-white border border-border rounded-xl space-y-2.5 mb-5">
-            {/* Free cases total banner if any free cases were awarded */}
-            {totalFreeCases > 0 && (
-              <div className="p-2.5 rounded-lg bg-primary-50 border border-primary/20 text-xs font-bold text-primary flex items-center gap-2">
-                <svg
-                  className="w-4 h-4 text-primary shrink-0"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V4a2 2 0 10-2 2h2m0 13l4-4m-4 4l-4-4"
-                  />
-                </svg>
-                <span>
-                  {totalFreeCases} {totalFreeCases === 1 ? t.free_cases_badge : t.free_cases_plural_badge}
-                </span>
-              </div>
-            )}
-
-            <div className="flex justify-between items-center text-xs text-ink-muted">
-              <span>{t.subtotal}</span>
-              <span className="font-semibold text-ink">
-                {formatINR(quoteSubtotal)}
-              </span>
-            </div>
-
-            <div className="flex justify-between items-center text-xs text-ink-muted">
-              <span>{t.gst}</span>
-              <span className="font-semibold text-ink">
-                {formatINR(quoteGst)}
-              </span>
-            </div>
-
-            <div className="h-px bg-border my-1" />
-
-            <div className="flex justify-between items-baseline pt-1">
-              <span className="text-sm font-bold text-ink">
-                {t.estimated_total}
-              </span>
-              <div className="text-right">
-                <span className="text-lg font-bold text-primary">
-                  {formatINR(quotePayable)}
-                </span>
-                <span className="block text-[10px] text-ink-muted">
-                  {t.incl_gst}
-                </span>
-              </div>
-            </div>
-
-            <p className="text-[11px] text-ink-muted text-center pt-1 border-t border-border flex items-center justify-center gap-1">
-              <svg className="w-3.5 h-3.5 text-ink-muted" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-              <span>{t.nothing_ordered_note}</span>
+            <p className="text-sm text-ink-muted mt-0.5">
+              {t.review_subline}
             </p>
           </div>
 
           {/* Inline Order Error (if any) */}
           {orderError && (
             <div
-              className="mb-4 p-3 bg-error-bg/30 border border-error/30 rounded-xl flex items-start gap-2 text-error text-xs"
+              className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2 text-red-700 text-xs"
               role="alert"
             >
               <svg
-                className="w-4 h-4 shrink-0 mt-0.5"
+                className="w-4 h-4 shrink-0 mt-0.5 text-red-500"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="2"
@@ -778,51 +517,454 @@ export const OrderByMessage: React.FC<OrderByMessageProps> = ({
                 <line x1="12" y1="8" x2="12" y2="12" />
                 <line x1="12" y1="16" x2="12.01" y2="16" />
               </svg>
-              <span>{orderError}</span>
+              <div className="flex-1">
+                <span>{orderError}</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleConfirmOrder}
+                className="min-tap text-xs font-bold text-red-700 underline shrink-0"
+              >
+                {t.retry}
+              </button>
             </div>
           )}
 
-          {/* Actions: Confirm Order OR Add to Cart */}
-          <div className="flex flex-col gap-2.5">
-            <button
-              type="button"
-              disabled={placingOrder || quoteLoading}
-              onClick={handleConfirmOrder}
-              className="min-tap w-full h-13 rounded-xl bg-primary text-white font-bold text-base flex items-center justify-center gap-2 hover:bg-primary-dark active:bg-primary-dark transition-colors disabled:opacity-50 select-none"
-            >
-              {placingOrder ? (
-                <>
-                  <svg
-                    className="animate-spin h-5 w-5 text-white"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-                  </svg>
-                  <span>Placing order...</span>
-                </>
-              ) : (
-                <>
-                  <span>{t.confirm_order_btn}</span>
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                  </svg>
-                </>
-              )}
-            </button>
+          {/* Parsed Items List */}
+          <div className="space-y-3 mb-5">
+            {editableLines.map((line, idx) => {
+              const sku = getSku(line.sku_code);
+              const ql = quoteLines.find((q) => q.sku_code === line.sku_code);
+              const isOutOfStock =
+                line.flags.includes('out_of_stock') || (sku && sku.stock_status === 'out');
+              const needsUnit = line.flags.includes('needs_unit') || line.unit === 'unknown';
+              const isNoMatch = line.flags.includes('no_match') || !line.sku_code;
 
-            <button
-              type="button"
-              onClick={handleAddAllToCart}
-              className="min-tap w-full h-12 rounded-xl bg-white border border-primary text-primary font-bold text-sm flex items-center justify-center gap-1.5 hover:bg-primary-50 transition-colors select-none"
-            >
-              <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-              </svg>
-              <span>{t.add_to_cart}</span>
-            </button>
+              // 5. No match card: no image, text "Not found", product picker, Remove button
+              if (isNoMatch) {
+                return (
+                  <div
+                    key={idx}
+                    className="p-3.5 bg-white border border-border rounded-xl flex flex-col gap-2.5"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="text-sm text-ink-muted truncate">
+                        {line.original_words ? `“${line.original_words}”` : ''}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveLine(idx)}
+                        className="min-tap text-sm text-ink-muted hover:text-red-600 underline font-medium focus:outline-none shrink-0"
+                      >
+                        {t.remove}
+                      </button>
+                    </div>
+
+                    <div className="text-sm font-semibold text-red-600">
+                      {t.not_found}
+                    </div>
+
+                    <div>
+                      <label htmlFor={`picker-${idx}`} className="sr-only">
+                        {t.select_product}
+                      </label>
+                      <select
+                        id={`picker-${idx}`}
+                        value=""
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            handleSelectAlternative(idx, e.target.value);
+                          }
+                        }}
+                        className="min-tap w-full h-12 px-3 bg-white border border-border rounded-lg text-sm text-ink focus:outline-none focus:border-primary"
+                      >
+                        <option value="">{t.select_product}</option>
+                        {catalogue.map((catSku) => (
+                          <option key={catSku.code} value={catSku.code}>
+                            {cleanProductName(catSku.name)} (
+                            {catSku.stock_status === 'out'
+                              ? lang === 'hi'
+                                ? 'आउट ऑफ स्टॉक'
+                                : 'Out of stock'
+                              : formatINR(catSku.case_price)}
+                            )
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                );
+              }
+
+              // Matched SKU Card
+              return (
+                <div
+                  key={idx}
+                  className="p-3.5 bg-white border border-border rounded-xl flex flex-col gap-2.5"
+                >
+                  {/* Top: 48px square thumbnail on left, words/confidence + name/total + case/price on right */}
+                  <div className="flex items-start gap-3">
+                    <img
+                      src={sku?.image_url || (line.sku_code ? getProductImage(line.sku_code) : '/products/placeholder.svg')}
+                      alt=""
+                      loading="lazy"
+                      className={`w-12 h-12 rounded-lg bg-gray-50 border border-border shrink-0 object-contain p-1 ${
+                        isOutOfStock ? 'filter grayscale opacity-60' : ''
+                      }`}
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).src = '/products/placeholder.svg';
+                      }}
+                    />
+
+                    <div className="flex-1 min-w-0">
+                      {/* Original words in quotes & confidence label */}
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-sm text-ink-muted truncate font-normal">
+                          {line.original_words ? `“${line.original_words}”` : ''}
+                        </span>
+                        {line.confidence === 'medium' && (
+                          <span className="text-xs font-semibold text-amber-700 shrink-0">
+                            {t.conf_please_check}
+                          </span>
+                        )}
+                        {line.confidence === 'low' && (
+                          <span className="text-xs font-semibold text-red-600 shrink-0">
+                            {t.conf_not_sure}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Product Name (no case suffix) & Line Total */}
+                      <div className="flex items-start justify-between gap-2 mt-0.5">
+                        <div
+                          className={`text-sm font-bold leading-snug line-clamp-2 ${
+                            isOutOfStock ? 'line-through text-ink-muted' : 'text-ink'
+                          }`}
+                        >
+                          {cleanProductName(sku?.name || line.sku_code || '')}
+                        </div>
+                        {!isOutOfStock && !needsUnit && ql && (
+                          <div className="text-sm font-bold text-ink shrink-0 text-right">
+                            {formatINR(ql.line_total)}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Case and Price Line */}
+                      {sku && (
+                        <div className="text-xs text-ink-muted mt-0.5">
+                          {lang === 'hi' ? `केस ${sku.units_per_case}` : `Case of ${sku.units_per_case}`} ·{' '}
+                          {formatINR(sku.case_price)} / {lang === 'hi' ? 'केस' : 'case'}{' '}
+                          {sku.price_includes_gst
+                            ? lang === 'hi'
+                              ? 'जीएसटी सहित'
+                              : 'incl. GST'
+                            : '+ GST'}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 4. Out of stock state */}
+                  {isOutOfStock && (
+                    <div className="flex flex-col gap-2 pt-2 border-t border-border">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-red-600">
+                          {t.out_of_stock_not_added}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveLine(idx)}
+                          className="min-tap text-sm text-ink-muted hover:text-red-600 underline font-medium focus:outline-none"
+                        >
+                          {t.remove}
+                        </button>
+                      </div>
+
+                      {/* Available instead chip for alternative */}
+                      {line.alternatives && line.alternatives.length > 0 && (() => {
+                        const altSku = getSku(line.alternatives[0]);
+                        if (!altSku || altSku.stock_status === 'out') return null;
+                        return (
+                          <div>
+                            <button
+                              type="button"
+                              onClick={() => handleSelectAlternative(idx, altSku.code)}
+                              className="min-tap inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-primary/30 bg-primary-50 text-xs font-semibold text-primary hover:bg-primary-100 transition-colors"
+                            >
+                              <span>{t.available_instead}:</span>
+                              <span className="font-bold">
+                                {cleanProductName(altSku.name)} ({getPackSize(altSku)})
+                              </span>
+                              <span>→</span>
+                            </button>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+
+                  {/* 3. Unit question: needs_unit */}
+                  {needsUnit && !isOutOfStock && (
+                    <div className="pt-2 border-t border-border flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-ink">
+                          {t.cases_or_pieces}
+                        </span>
+                        <span className="text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                          {t.choose_one}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleSelectUnit(idx, 'case')}
+                          className="min-tap h-12 rounded-lg border-2 border-border text-ink font-bold text-sm bg-white hover:border-primary hover:bg-primary-50 active:bg-primary-100 transition-colors flex items-center justify-center gap-1 select-none"
+                        >
+                          <span>
+                            {line.qty || 1} {lang === 'hi' ? 'केस' : 'Cases'}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSelectUnit(idx, 'piece')}
+                          className="min-tap h-12 rounded-lg border-2 border-border text-ink font-bold text-sm bg-white hover:border-primary hover:bg-primary-50 active:bg-primary-100 transition-colors flex items-center justify-center gap-1 select-none"
+                        >
+                          <span>
+                            {line.qty || 1} {lang === 'hi' ? 'पीस' : 'Pieces'}
+                          </span>
+                        </button>
+                      </div>
+
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveLine(idx)}
+                          className="min-tap text-sm text-ink-muted hover:text-red-600 underline font-medium focus:outline-none"
+                        >
+                          {t.remove}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 2. Alternatives side-by-side (if alternatives exist and in-stock & not needsUnit) */}
+                  {!isOutOfStock && !needsUnit && line.alternatives && line.alternatives.length > 0 && (
+                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border">
+                      {/* Current match (selected) */}
+                      <button
+                        type="button"
+                        className="min-tap flex items-center gap-2 p-1.5 rounded-lg border-2 border-primary bg-primary-50 text-ink text-left select-none"
+                      >
+                        <img
+                          src={sku?.image_url || (line.sku_code ? getProductImage(line.sku_code) : '')}
+                          alt=""
+                          loading="lazy"
+                          className="w-8 h-8 rounded bg-white object-contain p-0.5 border border-primary/20 shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-bold text-primary truncate">
+                            {getPackSize(sku)}
+                          </div>
+                        </div>
+                        <div className="w-4 h-4 rounded-full bg-primary text-white flex items-center justify-center shrink-0">
+                          <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                      </button>
+
+                      {/* Alternative match */}
+                      {(() => {
+                        const altSku = getSku(line.alternatives[0]);
+                        if (!altSku) return null;
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => handleSelectAlternative(idx, altSku.code)}
+                            className="min-tap flex items-center gap-2 p-1.5 rounded-lg border border-border bg-white text-ink text-left hover:border-primary/40 transition-colors select-none"
+                          >
+                            <img
+                              src={altSku.image_url || getProductImage(altSku.code)}
+                              alt=""
+                              loading="lazy"
+                              className="w-8 h-8 rounded bg-gray-50 object-contain p-0.5 border border-border shrink-0"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="text-xs font-semibold text-ink-muted truncate">
+                                {getPackSize(altSku)}
+                              </div>
+                            </div>
+                            <div className="w-4 h-4 rounded-full border border-border shrink-0" />
+                          </button>
+                        );
+                      })()}
+                    </div>
+                  )}
+
+                  {/* Stepper "- 5 cases +" (48px tall) and Remove text button */}
+                  {!isOutOfStock && !needsUnit && (
+                    <div className="flex items-center justify-between gap-3 pt-2 border-t border-border">
+                      <div className="flex items-center border border-border rounded-lg bg-surface h-12">
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateLineQty(idx, (line.qty || 1) - 1)}
+                          disabled={(line.qty || 1) <= 1}
+                          className="w-12 h-12 flex items-center justify-center text-ink text-lg font-bold hover:bg-gray-100 active:bg-gray-200 transition-colors disabled:opacity-30 disabled:hover:bg-transparent focus:outline-none select-none"
+                          aria-label="Decrease quantity"
+                        >
+                          −
+                        </button>
+                        <div className="px-3 min-w-[70px] text-center text-sm font-bold text-ink select-none">
+                          {line.qty || 1} {lang === 'hi' ? 'केस' : 'cases'}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateLineQty(idx, (line.qty || 1) + 1)}
+                          className="w-12 h-12 flex items-center justify-center text-ink text-lg font-bold hover:bg-gray-100 active:bg-gray-200 transition-colors focus:outline-none select-none"
+                          aria-label="Increase quantity"
+                        >
+                          +
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveLine(idx)}
+                        className="min-tap text-sm text-ink-muted hover:text-red-600 underline font-medium focus:outline-none"
+                      >
+                        {t.remove}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Nudge as one line of green sentence-case text */}
+                  {!isOutOfStock && !needsUnit && ql?.nudges && ql.nudges.length > 0 && (
+                    <div className="text-xs text-primary font-medium flex items-center gap-1.5 pt-0.5">
+                      <svg className="w-3.5 h-3.5 shrink-0 text-primary" fill="currentColor" viewBox="0 0 20 20">
+                        <path
+                          fillRule="evenodd"
+                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      <span>{toSentenceCase(ql.nudges[0])}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Empty state if all items removed */}
+          {editableLines.length === 0 && (
+            <div className="p-8 text-center bg-white border border-border rounded-xl space-y-3 mb-5">
+              <p className="text-sm text-ink-muted">
+                {lang === 'hi' ? 'कोई सामान नहीं बचा।' : 'No items left in this order.'}
+              </p>
+              <button
+                type="button"
+                onClick={() => setStep('input')}
+                className="min-tap px-4 py-2 rounded-lg bg-primary text-white text-sm font-semibold"
+              >
+                {t.edit_text_btn}
+              </button>
+            </div>
+          )}
+
+          {/* 6. Summary card */}
+          {editableLines.length > 0 && (
+            <div className="p-4 bg-white border border-border rounded-xl space-y-2 mb-4">
+              <div className="flex justify-between text-sm text-ink-muted">
+                <span>{lang === 'hi' ? 'उप-कुल (सबटोटल)' : 'Subtotal'}</span>
+                <span className="font-semibold text-ink">{formatINR(quoteSubtotal)}</span>
+              </div>
+
+              <div className="flex justify-between text-sm text-ink-muted">
+                <span>{lang === 'hi' ? 'जीएसटी' : 'GST'}</span>
+                <span className="font-semibold text-ink">{formatINR(quoteGst)}</span>
+              </div>
+
+              <div className="pt-2 border-t border-border flex justify-between text-base font-bold text-ink">
+                <span>{t.total_incl_gst}</span>
+                <span className="text-primary">{formatINR(quotePayable)}</span>
+              </div>
+
+              {excludedCount > 0 && (
+                <div className="pt-2 border-t border-border text-xs text-red-600 font-medium">
+                  {(excludedCount === 1 ? t.item_not_included : t.items_not_included).replace(
+                    '{n}',
+                    String(excludedCount)
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 7. Fixed bottom bar (safe-area aware) */}
+          <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-border z-30 shadow-none pb-[env(safe-area-inset-bottom,0px)]">
+            <div className="max-w-[420px] mx-auto p-4 flex flex-col gap-2">
+              <div className="text-center text-sm font-bold text-ink">
+                {validItemsCount}{' '}
+                {validItemsCount === 1
+                  ? lang === 'hi'
+                    ? 'सामान'
+                    : 'item'
+                  : lang === 'hi'
+                  ? 'सामान'
+                  : 'items'}{' '}
+                · {formatINR(quotePayable)} {lang === 'hi' ? 'जीएसटी सहित' : 'incl. GST'}
+              </div>
+
+              <button
+                type="button"
+                disabled={isConfirmDisabled}
+                onClick={handleConfirmOrder}
+                className="min-tap w-full h-14 rounded-xl bg-primary text-white font-bold text-base flex items-center justify-center gap-2 hover:bg-primary-dark active:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed select-none"
+              >
+                {placingOrder ? (
+                  <>
+                    <svg
+                      className="animate-spin h-5 w-5 text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8v8H4z"
+                      />
+                    </svg>
+                    <span>{t.placing_order}</span>
+                  </>
+                ) : (
+                  <span>{t.confirm_order_btn}</span>
+                )}
+              </button>
+
+              <p className="text-xs text-ink-muted text-center">
+                {t.nothing_ordered_note}
+              </p>
+
+              <button
+                type="button"
+                disabled={validItemsCount === 0}
+                onClick={handleAddAllToCart}
+                className="min-tap text-xs font-semibold text-primary hover:underline text-center disabled:opacity-40 disabled:no-underline"
+              >
+                {t.add_to_cart_and_keep_shopping}
+              </button>
+            </div>
           </div>
         </div>
       )}

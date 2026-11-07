@@ -1,16 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 150" width="200" height="150">
   <rect width="200" height="150" fill="#F8FAFC" rx="10"/>
-  <!-- Tea 100g Compact Pack (larger, centered, 4:3) -->
-  <rect x="50" y="20" width="100" height="110" rx="7" fill="#047857" stroke="#065F46" stroke-width="2.5"/>
-  <rect x="56" y="26" width="88" height="98" rx="5" fill="#059669"/>
-  <!-- Top decorative band -->
-  <rect x="56" y="26" width="88" height="20" fill="#047857"/>
-  <line x1="56" y1="46" x2="144" y2="46" stroke="#FBBF24" stroke-width="2"/>
+  <!-- Tea 100g Small Foil Pouch (visibly different shape from 250g box) -->
+  <!-- Top crimped seal header -->
+  <rect x="52" y="28" width="96" height="14" rx="2" fill="#047857" stroke="#065F46" stroke-width="2"/>
+  <line x1="56" y1="35" x2="144" y2="35" stroke="#FBBF24" stroke-width="2" stroke-dasharray="3 3"/>
+  <!-- Pouch body (curved gusset bottom) -->
+  <path d="M54 42 L146 42 L140 122 Q100 128 60 122 Z" fill="#059669" stroke="#065F46" stroke-width="2.5"/>
+  <path d="M58 46 L142 46 L136 118 Q100 124 64 118 Z" fill="#10B981"/>
   <!-- Stylized Tea Leaves in Center -->
-  <path d="M100 55 C100 55, 76 66, 79 86 C83 98, 100 103, 100 103 C100 103, 117 98, 121 86 C124 66, 100 55, 100 55 Z" fill="#D1FAE5"/>
-  <path d="M100 60 L100 98" stroke="#047857" stroke-width="1.8" stroke-linecap="round"/>
-  <path d="M100 74 C92 70, 87 75, 87 75" stroke="#047857" stroke-width="1.5" stroke-linecap="round" fill="none"/>
-  <path d="M100 74 C108 70, 113 75, 113 75" stroke="#047857" stroke-width="1.5" stroke-linecap="round" fill="none"/>
-  <!-- Bottom gold band -->
-  <line x1="56" y1="116" x2="144" y2="116" stroke="#FBBF24" stroke-width="1.5"/>
+  <circle cx="100" cy="80" r="22" fill="#047857" opacity="0.9"/>
+  <path d="M100 66 C100 66, 88 74, 90 86 C92 92, 100 95, 100 95 C100 95, 108 92, 110 86 C112 74, 100 66, 100 66 Z" fill="#D1FAE5"/>
+  <path d="M100 70 L100 93" stroke="#047857" stroke-width="1.5" stroke-linecap="round"/>
 </svg>
