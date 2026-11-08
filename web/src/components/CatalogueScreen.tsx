@@ -13,6 +13,7 @@ import {
   formatCases,
 } from '../utils';
 import { ProductImage } from './ProductImage';
+import { QuantityStepper } from './QuantityStepper';
 
 interface CatalogueScreenProps {
   lang: Language;
@@ -44,32 +45,15 @@ export const CatalogueScreen: React.FC<CatalogueScreenProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
 
-  // Interactive inline quantity editing
-  const [editingSku, setEditingSku] = useState<string | null>(null);
-  const [editingQty, setEditingQty] = useState<string>('');
-
-  const handleStartEditing = (skuCode: string, currentQty: number) => {
-    setEditingSku(skuCode);
-    setEditingQty(currentQty.toString());
-  };
-
-  const handleFinishEditing = (skuCode: string) => {
-    const val = parseInt(editingQty, 10);
-    if (!isNaN(val) && val >= 0) {
-      onUpdateQty(skuCode, val);
-    }
-    setEditingSku(null);
-  };
-
   // Derive categories dynamically from catalogue items
   const categories = useMemo(() => {
     return deriveCategoriesFromCatalogue(catalogue);
   }, [catalogue]);
 
-  // Filter catalogue items by search and category
+  // Filter catalogue items by search and category, placing out of stock products at last
   const filteredProducts = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    return catalogue.filter((sku) => {
+    const list = catalogue.filter((sku) => {
       // Category filter
       if (selectedCategory !== 'All') {
         const cat = getProductCategory(sku);
@@ -84,6 +68,13 @@ export const CatalogueScreen: React.FC<CatalogueScreenProps> = ({
       }
 
       return true;
+    });
+
+    // In-stock products first, out of stock products shown at last
+    return [...list].sort((a, b) => {
+      const aOos = a.stock_status === 'out' ? 1 : 0;
+      const bOos = b.stock_status === 'out' ? 1 : 0;
+      return aOos - bOos;
     });
   }, [catalogue, selectedCategory, searchQuery]);
 
@@ -115,7 +106,7 @@ export const CatalogueScreen: React.FC<CatalogueScreenProps> = ({
             d="M4 12a8 8 0 018-8v8H4z"
           ></path>
         </svg>
-        <span className="text-sm font-semibold text-ink-muted">
+        <span className="text-body font-semibold text-ink-muted">
           {t.loading}
         </span>
       </div>
@@ -138,16 +129,16 @@ export const CatalogueScreen: React.FC<CatalogueScreenProps> = ({
             <line x1="12" y1="16" x2="12.01" y2="16" />
           </svg>
         </div>
-        <h2 className="text-base font-bold text-ink mb-1">
+        <h2 className="text-title font-bold text-ink mb-1">
           {t.error_title}
         </h2>
-        <p className="text-xs text-ink-muted max-w-xs mb-5">
+        <p className="text-body text-ink-muted max-w-xs mb-5">
           {t.catalogue_error_msg}
         </p>
         <button
           type="button"
           onClick={onRetry}
-          className="min-tap px-6 py-2.5 rounded-xl bg-primary text-white font-semibold text-sm hover:bg-primary-dark transition-colors"
+          className="min-tap px-6 py-2.5 rounded-xl bg-primary text-white font-bold text-body hover:bg-primary-dark transition-colors"
         >
           {t.retry}
         </button>
@@ -161,7 +152,7 @@ export const CatalogueScreen: React.FC<CatalogueScreenProps> = ({
       <button
         type="button"
         onClick={onOpenOrderByMessage}
-        className="w-full min-tap h-12 px-4 border border-primary rounded-xl bg-primary flex items-center justify-center space-x-2 text-white font-bold text-sm hover:bg-primary-dark active:bg-primary-dark focus:outline-none transition-colors mb-1.5 select-none"
+        className="w-full min-tap h-12 px-4 border border-primary rounded-xl bg-primary flex items-center justify-center space-x-2 text-white font-bold text-body hover:bg-primary-dark active:bg-primary-dark focus:outline-none transition-colors mb-1.5 select-none"
       >
         <svg
           className="w-5 h-5 shrink-0 text-white"
@@ -189,7 +180,7 @@ export const CatalogueScreen: React.FC<CatalogueScreenProps> = ({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t.search_placeholder}
-            className="w-full min-h-[44px] h-12 pl-10 pr-4 text-sm bg-white border border-border rounded-xl text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none transition-colors"
+            className="w-full min-h-[44px] h-12 pl-10 pr-4 text-body bg-white border border-border rounded-xl text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none transition-colors"
           />
           <span className="absolute left-3.5 top-3.5 text-ink-muted pointer-events-none">
             <svg
@@ -227,7 +218,7 @@ export const CatalogueScreen: React.FC<CatalogueScreenProps> = ({
                 key={cat}
                 type="button"
                 onClick={() => setSelectedCategory(cat)}
-                className={`min-h-[44px] h-[46px] px-4 rounded-xl text-xs font-semibold border flex items-center justify-center whitespace-nowrap transition-colors select-none ${
+                className={`min-h-[44px] h-[46px] px-4 rounded-xl text-body font-semibold border flex items-center justify-center whitespace-nowrap transition-colors select-none ${
                   isSelected
                     ? 'bg-primary text-white border-primary'
                     : 'bg-white text-ink border-border hover:bg-gray-50'
@@ -258,10 +249,10 @@ export const CatalogueScreen: React.FC<CatalogueScreenProps> = ({
               />
             </svg>
           </div>
-          <h2 className="text-sm font-bold text-ink mb-1">
+          <h2 className="text-title font-bold text-ink mb-1">
             {t.no_products_title}
           </h2>
-          <p className="text-xs text-ink-muted max-w-xs">
+          <p className="text-body text-ink-muted max-w-xs">
             {t.no_products_subtitle}
           </p>
         </div>
@@ -302,7 +293,7 @@ export const CatalogueScreen: React.FC<CatalogueScreenProps> = ({
                 <div className="aspect-[4/3] relative w-full bg-gray-50 flex items-center justify-center p-2 overflow-hidden shrink-0">
                   {/* Low Stock Badge */}
                   {isLowStock && (
-                    <span className="absolute top-2 right-2 z-10 px-2 py-0.5 rounded-full text-[10px] font-bold bg-warning-bg border border-warning/40 text-warning select-none">
+                    <span className="absolute top-2 right-2 z-10 px-2 py-0.5 rounded-full text-micro font-bold bg-warning-bg border border-warning/40 text-warning select-none">
                       {t.few_left}
                     </span>
                   )}
@@ -312,41 +303,46 @@ export const CatalogueScreen: React.FC<CatalogueScreenProps> = ({
                     skuCode={sku.code}
                     alt={cleanProductName(sku.name)}
                   />
+
+                  {/* Small nudge on the product image itself at the bottom */}
+                  {currentQty > 0 && quoteLineMsg && (
+                    <div className="absolute bottom-1.5 inset-x-1.5 z-10 px-2 py-0.5 rounded-[8px] bg-[#E8F5E9]/95 border border-[#0C6B1A]/30 text-micro font-semibold text-[#0C6B1A] text-center leading-tight line-clamp-2 break-words select-none">
+                      {quoteLineMsg}
+                    </div>
+                  )}
                 </div>
 
                 {/* Details & Controls */}
                 <div className="p-2.5 flex flex-col flex-1 justify-between">
                   <div className="flex flex-col">
                     {/* 1. Product Name without trailing ", case of N" */}
-                    <h2 className="text-xs font-bold text-ink leading-snug line-clamp-2 min-h-[32px] break-words">
+                    <h2 className="text-body font-semibold text-ink leading-snug line-clamp-2 min-h-[40px] break-words">
                       {cleanProductName(sku.name)}
                     </h2>
 
                     {/* 1. "Case of N" once, as a small grey line under the name */}
-                    <p className="text-[12px] text-ink-muted mt-0.5 leading-tight">
+                    <p className="text-small text-ink-muted mt-0.5 leading-tight">
                       {lang === 'hi' ? `${sku.units_per_case} का केस` : `Case of ${sku.units_per_case}`}
                     </p>
 
-                    {/* 2. Scheme badge: between case line and price (#E8F5E9 fill, #0C6B1A text, 13px semibold, rounded 8px) */}
+                    {/* 2. Scheme badge: between case line and price (#E8F5E9 fill, #0C6B1A text, rounded 8px) */}
                     {schemeBadge && (
-                      <div className="mt-2 mb-1 px-2.5 py-1 rounded-[8px] bg-[#E8F5E9] text-[#0C6B1A] text-[13px] font-semibold leading-tight line-clamp-2 inline-block w-fit max-w-full break-words">
+                      <div className="mt-1.5 mb-1 px-2.5 py-0.5 rounded-[8px] bg-[#E8F5E9] text-[#0C6B1A] text-micro font-semibold leading-tight line-clamp-2 inline-block w-fit max-w-full break-words">
                         {schemeBadge}
                       </div>
                     )}
 
-                    {/* 4. Price: "₹777.60 / case" at 18px bold, "+ GST" (or "incl. GST") at 13px in #374151, "₹8.10 per piece × 96" at 13px in #6B7280 */}
-                    <div className="mt-2">
-                      <div className="flex flex-wrap items-baseline gap-x-1.5 leading-tight">
-                        <span className="text-[18px] font-bold text-ink">
-                          {formatINR(sku.case_price)} / {lang === 'hi' ? 'केस' : 'case'}
-                        </span>
-                        <span className="text-[13px] text-[#374151] font-normal whitespace-nowrap">
-                          {sku.price_includes_gst
-                            ? (lang === 'hi' ? 'जीएसटी सहित' : 'incl. GST')
-                            : (lang === 'hi' ? '+ जीएसटी' : '+ GST')}
-                        </span>
+                    {/* 4. Price: "₹777.60 / case" at 18px bold, "+ GST" on the next line at 13px in #374151, "₹8.10 per piece × 96" at 13px in #6B7280 */}
+                    <div className="mt-2 space-y-0.5">
+                      <div className="text-price font-bold tabular-nums text-ink leading-tight">
+                        {formatINR(sku.case_price)} / {lang === 'hi' ? 'केस' : 'case'}
                       </div>
-                      <p className="text-[13px] text-[#6B7280] mt-0.5 leading-tight">
+                      <div className="text-small text-[#374151] font-normal leading-tight">
+                        {sku.price_includes_gst
+                          ? (lang === 'hi' ? 'जीएसटी सहित' : 'incl. GST')
+                          : (lang === 'hi' ? '+ जीएसटी' : '+ GST')}
+                      </div>
+                      <p className="text-small text-[#6B7280] leading-tight">
                         {formatINR(sku.price_per_piece)} {lang === 'hi' ? 'प्रति पीस' : 'per piece'} × {sku.units_per_case}
                       </p>
                     </div>
@@ -356,7 +352,7 @@ export const CatalogueScreen: React.FC<CatalogueScreenProps> = ({
                   <div className="mt-auto pt-3">
                     {/* Out of Stock: greyed label, no button */}
                     {isOutOfStock ? (
-                      <div className="w-full min-h-[48px] h-12 rounded-xl bg-gray-100 text-ink-muted text-xs font-semibold flex items-center justify-center select-none">
+                      <div className="w-full min-h-[48px] h-12 rounded-xl bg-gray-100 text-ink-muted text-small font-semibold flex items-center justify-center select-none">
                         {t.out_of_stock}
                       </div>
                     ) : currentQty === 0 ? (
@@ -364,64 +360,19 @@ export const CatalogueScreen: React.FC<CatalogueScreenProps> = ({
                       <button
                         type="button"
                         onClick={() => onUpdateQty(sku.code, 1)}
-                        className="w-full min-h-[48px] h-12 rounded-xl border-2 border-primary bg-white text-primary font-bold text-xs flex items-center justify-center hover:bg-primary-50 active:bg-primary-50 transition-colors select-none"
+                        className="w-full min-h-[48px] h-12 rounded-xl border-2 border-primary bg-white text-primary font-bold text-body flex items-center justify-center hover:bg-primary-50 active:bg-primary-50 transition-colors select-none"
                       >
                         {t.add}
                       </button>
                     ) : (
-                      /* In cart: filled green stepper "- 5 cases +", min 48px tall */
-                      <div className="w-full min-h-[48px] h-12 rounded-xl bg-primary text-white font-bold flex items-center justify-between px-1 select-none">
-                        <button
-                          type="button"
-                          onClick={() => onUpdateQty(sku.code, Math.max(0, currentQty - 1))}
-                          className="w-9 h-10 flex items-center justify-center text-white text-xl font-bold hover:bg-primary-dark active:bg-primary-dark rounded-lg transition-colors focus:outline-none"
-                          aria-label={`Decrease ${sku.name}`}
-                        >
-                          −
-                        </button>
-
-                        {/* Tapping number opens numeric input */}
-                        {editingSku === sku.code ? (
-                          <input
-                            type="number"
-                            inputMode="numeric"
-                            min="0"
-                            autoFocus
-                            value={editingQty}
-                            onChange={(e) => setEditingQty(e.target.value)}
-                            onBlur={() => handleFinishEditing(sku.code)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') handleFinishEditing(sku.code);
-                            }}
-                            className="w-12 h-8 bg-white text-ink font-bold text-center text-xs rounded outline-none border border-primary-dark"
-                          />
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => handleStartEditing(sku.code, currentQty)}
-                            className="flex-1 min-w-0 text-center text-xs font-bold text-white px-1 py-1 truncate hover:underline"
-                            title="Tap to type quantity"
-                          >
-                            {formatCases(currentQty, lang)}
-                          </button>
-                        )}
-
-                        <button
-                          type="button"
-                          onClick={() => onUpdateQty(sku.code, currentQty + 1)}
-                          className="w-9 h-10 flex items-center justify-center text-white text-xl font-bold hover:bg-primary-dark active:bg-primary-dark rounded-lg transition-colors focus:outline-none"
-                          aria-label={`Increase ${sku.name}`}
-                        >
-                          +
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Under the control: scheme result or nudge from POST /cart/quote */}
-                    {currentQty > 0 && quoteLineMsg && (
-                      <div className="mt-1.5 text-[11px] font-semibold text-primary leading-tight text-center line-clamp-2 break-words">
-                        {quoteLineMsg}
-                      </div>
+                      /* In cart: filled green stepper with directly editable quantity, min 48px tall */
+                      <QuantityStepper
+                        qty={currentQty}
+                        onUpdate={(newQty) => onUpdateQty(sku.code, newQty)}
+                        lang={lang}
+                        variant="green"
+                        ariaLabel={cleanProductName(sku.name)}
+                      />
                     )}
                   </div>
                 </div>
@@ -436,14 +387,14 @@ export const CatalogueScreen: React.FC<CatalogueScreenProps> = ({
       {totalCasesInCart > 0 && (
         <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[420px] bg-primary text-white p-3 z-40 border-t border-primary-dark flex items-center justify-between select-none">
           <div className="flex flex-col">
-            <span className="text-xs uppercase tracking-wider text-green-100 font-medium">
+            <span className="text-small uppercase tracking-wider text-green-100 font-medium">
               {formatCases(totalCasesInCart, lang)}
             </span>
             <div className="flex items-baseline gap-1.5">
-              <span className="text-base font-bold">
+              <span className="text-price font-bold tabular-nums text-white">
                 {formatINR(quote?.payable)}
               </span>
-              <span className="text-[11px] font-normal text-green-100">
+              <span className="text-small font-normal text-green-100">
                 {t.incl_gst}
               </span>
             </div>
@@ -452,7 +403,7 @@ export const CatalogueScreen: React.FC<CatalogueScreenProps> = ({
           <button
             type="button"
             onClick={onViewCart}
-            className="min-tap px-4 py-2 rounded-xl bg-white text-primary font-bold text-sm flex items-center space-x-1.5 focus:outline-none hover:bg-gray-100 active:bg-gray-200 transition-colors"
+            className="min-tap px-4 py-2 rounded-xl bg-white text-primary font-bold text-body flex items-center space-x-1.5 focus:outline-none hover:bg-gray-100 active:bg-gray-200 transition-colors"
           >
             <span>{t.view_cart}</span>
             <span>→</span>

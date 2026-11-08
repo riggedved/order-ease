@@ -13,9 +13,9 @@ import {
   getPackSize,
   getPackWeightGrams,
   toSentenceCase,
-  formatCases,
 } from '../utils';
 import { ProductImage } from './ProductImage';
+import { QuantityStepper } from './QuantityStepper';
 
 interface OrderByMessageProps {
   lang: Language;
@@ -311,7 +311,7 @@ export const OrderByMessage: React.FC<OrderByMessageProps> = ({
             <button
               type="button"
               onClick={onBackToCatalogue}
-              className="min-tap -ml-2 px-2 inline-flex items-center text-sm font-semibold text-ink hover:text-primary transition-colors focus:outline-none"
+              className="min-tap -ml-2 px-2 inline-flex items-center text-body font-semibold text-ink hover:text-primary transition-colors focus:outline-none"
             >
               <svg
                 className="w-5 h-5 mr-1"
@@ -328,10 +328,10 @@ export const OrderByMessage: React.FC<OrderByMessageProps> = ({
 
           {/* 3. Heading & Subline */}
           <div className="mb-4">
-            <h1 className="text-xl font-bold text-ink">
+            <h1 className="text-title font-bold text-ink">
               {t.order_by_msg_title}
             </h1>
-            <p className="text-sm text-ink-muted mt-0.5">
+            <p className="text-small text-ink-muted mt-0.5">
               {t.order_by_msg_subline}
             </p>
           </div>
@@ -346,12 +346,12 @@ export const OrderByMessage: React.FC<OrderByMessageProps> = ({
                 autoFocus
                 rows={8}
                 placeholder={t.order_input_placeholder}
-                className="w-full p-3.5 bg-white border border-border rounded-xl text-base text-ink placeholder:text-ink-muted focus:outline-none focus:border-primary disabled:bg-gray-50 disabled:text-ink-muted resize-none leading-relaxed transition-colors shadow-none"
+                className="w-full p-3.5 bg-white border border-border rounded-xl text-body text-ink placeholder:text-ink-muted focus:outline-none focus:border-primary disabled:bg-gray-50 disabled:text-ink-muted resize-none leading-relaxed transition-colors shadow-none"
               />
             </div>
 
             {/* 5. Complete Example & Try link */}
-            <div className="mt-2 text-xs text-ink-muted flex flex-wrap items-center gap-1.5 leading-relaxed">
+            <div className="mt-2 text-small text-ink-muted flex flex-wrap items-center gap-1.5 leading-relaxed">
               <span>{t.example_preview_label}</span>
               <button
                 type="button"
@@ -366,7 +366,7 @@ export const OrderByMessage: React.FC<OrderByMessageProps> = ({
             {/* 7. Error state */}
             {error && (
               <div
-                className="mt-4 p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2.5 text-xs text-red-700"
+                className="mt-4 p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2.5 text-small text-red-700"
                 role="alert"
               >
                 <svg
@@ -386,7 +386,7 @@ export const OrderByMessage: React.FC<OrderByMessageProps> = ({
                 <button
                   type="button"
                   onClick={() => handleParseOrder()}
-                  className="min-tap text-xs font-bold text-red-700 underline focus:outline-none shrink-0"
+                  className="min-tap text-body font-bold text-red-700 underline focus:outline-none shrink-0"
                 >
                   {t.retry}
                 </button>
@@ -399,7 +399,7 @@ export const OrderByMessage: React.FC<OrderByMessageProps> = ({
                 <button
                   type="submit"
                   disabled={!orderText.trim() || loading}
-                  className="min-tap w-full h-14 rounded-xl bg-primary text-white font-bold text-base flex items-center justify-center gap-2 hover:bg-primary-dark active:bg-primary-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed select-none"
+                  className="min-tap w-full h-14 rounded-xl bg-primary text-white font-bold text-body flex items-center justify-center gap-2 hover:bg-primary-dark active:bg-primary-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed select-none"
                 >
                   {loading ? (
                     <>
@@ -443,7 +443,7 @@ export const OrderByMessage: React.FC<OrderByMessageProps> = ({
             <button
               type="button"
               onClick={() => setStep('input')}
-              className="min-tap -ml-2 px-2 inline-flex items-center text-sm font-semibold text-ink hover:text-primary transition-colors focus:outline-none"
+              className="min-tap -ml-2 px-2 inline-flex items-center text-body font-semibold text-ink hover:text-primary transition-colors focus:outline-none"
             >
               <svg
                 className="w-5 h-5 mr-1"
@@ -460,10 +460,10 @@ export const OrderByMessage: React.FC<OrderByMessageProps> = ({
 
           {/* Heading & Subtitle */}
           <div className="mb-4">
-            <h1 className="text-xl font-bold text-ink">
+            <h1 className="text-title font-bold text-ink">
               {t.review_title}
             </h1>
-            <p className="text-sm text-ink-muted mt-0.5">
+            <p className="text-small text-ink-muted mt-0.5">
               {t.review_subline}
             </p>
           </div>
@@ -486,19 +486,19 @@ export const OrderByMessage: React.FC<OrderByMessageProps> = ({
                     className="p-3.5 bg-white border border-border rounded-xl flex flex-col gap-2.5"
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <div className="text-sm text-ink-muted truncate">
+                      <div className="text-small text-ink-muted truncate">
                         {line.original_words ? `“${line.original_words}”` : ''}
                       </div>
                       <button
                         type="button"
                         onClick={() => handleRemoveLine(idx)}
-                        className="min-tap text-sm text-ink-muted hover:text-red-600 underline font-medium focus:outline-none shrink-0"
+                        className="min-tap text-small text-ink-muted hover:text-red-600 underline font-medium focus:outline-none shrink-0"
                       >
                         {t.remove}
                       </button>
                     </div>
 
-                    <div className="text-sm font-semibold text-red-600">
+                    <div className="text-small font-semibold text-red-600">
                       {t.not_found}
                     </div>
 
@@ -514,7 +514,7 @@ export const OrderByMessage: React.FC<OrderByMessageProps> = ({
                             handleSelectAlternative(idx, e.target.value);
                           }
                         }}
-                        className="min-tap w-full h-12 px-3 bg-white border border-border rounded-lg text-sm text-ink focus:outline-none focus:border-primary"
+                        className="min-tap w-full h-12 px-3 bg-white border border-border rounded-lg text-body text-ink focus:outline-none focus:border-primary"
                       >
                         <option value="">{t.select_product}</option>
                         {catalogue.map((catSku) => (
@@ -549,16 +549,16 @@ export const OrderByMessage: React.FC<OrderByMessageProps> = ({
                     <div className="flex-1 min-w-0">
                       {/* Original words in quotes & confidence label (Out-of-stock lines show no confidence label) */}
                       <div className="flex items-center justify-between gap-1">
-                        <span className="text-sm text-ink-muted truncate font-normal">
+                        <span className="text-small text-ink-muted truncate font-normal">
                           {line.original_words ? `“${line.original_words}”` : ''}
                         </span>
                         {!isOutOfStock && line.confidence === 'medium' && (
-                          <span className="text-xs font-semibold text-amber-700 shrink-0">
+                          <span className="text-small font-semibold text-amber-700 shrink-0">
                             {t.conf_please_check}
                           </span>
                         )}
                         {!isOutOfStock && line.confidence === 'low' && (
-                          <span className="text-xs font-semibold text-red-600 shrink-0">
+                          <span className="text-small font-semibold text-red-600 shrink-0">
                             {t.conf_not_sure}
                           </span>
                         )}
@@ -567,14 +567,14 @@ export const OrderByMessage: React.FC<OrderByMessageProps> = ({
                       {/* Product Name (no case suffix) & Line Total */}
                       <div className="flex items-start justify-between gap-2 mt-0.5">
                         <div
-                          className={`text-sm font-bold leading-snug line-clamp-2 ${
+                          className={`text-body font-semibold leading-snug line-clamp-2 ${
                             isOutOfStock ? 'line-through text-ink-muted' : 'text-ink'
                           }`}
                         >
                           {cleanProductName(sku?.name || line.sku_code || '')}
                         </div>
                         {!isOutOfStock && !needsUnit && ql && (
-                          <div className="text-sm font-bold text-ink shrink-0 text-right">
+                          <div className="text-price font-bold tabular-nums text-ink shrink-0 text-right">
                             {formatINR(ql.line_total)}
                           </div>
                         )}
@@ -582,7 +582,7 @@ export const OrderByMessage: React.FC<OrderByMessageProps> = ({
 
                       {/* Case and Price Line */}
                       {sku && (
-                        <div className="text-xs text-ink-muted mt-0.5">
+                        <div className="text-small text-ink-muted mt-0.5 tabular-nums">
                           {lang === 'hi' ? `केस ${sku.units_per_case}` : `Case of ${sku.units_per_case}`} ·{' '}
                           {formatINR(sku.case_price)} / {lang === 'hi' ? 'केस' : 'case'}{' '}
                           {sku.price_includes_gst
@@ -599,13 +599,13 @@ export const OrderByMessage: React.FC<OrderByMessageProps> = ({
                   {isOutOfStock && (
                     <div className="flex flex-col gap-2 pt-2 border-t border-border">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-red-600">
+                        <span className="text-small font-semibold text-red-600">
                           {t.out_of_stock_not_added}
                         </span>
                         <button
                           type="button"
                           onClick={() => handleRemoveLine(idx)}
-                          className="min-tap text-sm text-ink-muted hover:text-red-600 underline font-medium focus:outline-none"
+                          className="min-tap text-small text-ink-muted hover:text-red-600 underline font-medium focus:outline-none"
                         >
                           {t.remove}
                         </button>
@@ -621,7 +621,7 @@ export const OrderByMessage: React.FC<OrderByMessageProps> = ({
                             <button
                               type="button"
                               onClick={() => handleSelectAlternative(idx, altSku.code)}
-                              className="min-tap inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-primary/30 bg-primary-50 text-xs font-semibold text-primary hover:bg-primary-100 transition-colors"
+                              className="min-tap inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-primary/30 bg-primary-50 text-body font-semibold text-primary hover:bg-primary-100 transition-colors"
                             >
                               <span>{t.available_instead}:</span>
                               <span className="font-bold">
@@ -639,10 +639,10 @@ export const OrderByMessage: React.FC<OrderByMessageProps> = ({
                   {needsUnit && !isOutOfStock && (
                     <div className="pt-2 border-t border-border flex flex-col gap-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-ink">
+                        <span className="text-small font-bold text-ink">
                           {t.cases_or_pieces}
                         </span>
-                        <span className="text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                        <span className="text-small font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
                           {t.choose_one}
                         </span>
                       </div>
@@ -651,7 +651,7 @@ export const OrderByMessage: React.FC<OrderByMessageProps> = ({
                         <button
                           type="button"
                           onClick={() => handleSelectUnit(idx, 'case')}
-                          className="min-tap h-12 rounded-lg border-2 border-border text-ink font-bold text-sm bg-white hover:border-primary hover:bg-primary-50 active:bg-primary-100 transition-colors flex items-center justify-center gap-1 select-none"
+                          className="min-tap h-12 rounded-lg border-2 border-border text-ink font-bold text-body bg-white hover:border-primary hover:bg-primary-50 active:bg-primary-100 transition-colors flex items-center justify-center gap-1 select-none"
                         >
                           <span>
                             {line.qty || 1} {lang === 'hi' ? 'केस' : 'Cases'}
@@ -660,7 +660,7 @@ export const OrderByMessage: React.FC<OrderByMessageProps> = ({
                         <button
                           type="button"
                           onClick={() => handleSelectUnit(idx, 'piece')}
-                          className="min-tap h-12 rounded-lg border-2 border-border text-ink font-bold text-sm bg-white hover:border-primary hover:bg-primary-50 active:bg-primary-100 transition-colors flex items-center justify-center gap-1 select-none"
+                          className="min-tap h-12 rounded-lg border-2 border-border text-ink font-bold text-body bg-white hover:border-primary hover:bg-primary-50 active:bg-primary-100 transition-colors flex items-center justify-center gap-1 select-none"
                         >
                           <span>
                             {line.qty || 1} {lang === 'hi' ? 'पीस' : 'Pieces'}
@@ -672,7 +672,7 @@ export const OrderByMessage: React.FC<OrderByMessageProps> = ({
                         <button
                           type="button"
                           onClick={() => handleRemoveLine(idx)}
-                          className="min-tap text-sm text-ink-muted hover:text-red-600 underline font-medium focus:outline-none"
+                          className="min-tap text-small text-ink-muted hover:text-red-600 underline font-medium focus:outline-none"
                         >
                           {t.remove}
                         </button>
@@ -709,7 +709,7 @@ export const OrderByMessage: React.FC<OrderByMessageProps> = ({
                             </div>
                             <div className="flex-1 min-w-0">
                               <div
-                                className={`text-xs truncate ${
+                                className={`text-body truncate ${
                                   isSelected ? 'font-bold text-primary' : 'font-semibold text-ink-muted'
                                 }`}
                               >
@@ -737,45 +737,46 @@ export const OrderByMessage: React.FC<OrderByMessageProps> = ({
                     </div>
                   )}
 
-                  {/* Stepper "- 5 cases +" (48px tall) and Remove text button */}
+                  {/* Stepper with editable quantity (48px tall) and Remove text button */}
                   {!isOutOfStock && !needsUnit && (
                     <div className="flex items-center justify-between gap-3 pt-2 border-t border-border">
-                      <div className="flex items-center border border-border rounded-lg bg-surface h-12">
-                        <button
-                          type="button"
-                          onClick={() => handleUpdateLineQty(idx, (line.qty || 1) - 1)}
-                          disabled={(line.qty || 1) <= 1}
-                          className="w-12 h-12 flex items-center justify-center text-ink text-lg font-bold hover:bg-gray-100 active:bg-gray-200 transition-colors disabled:opacity-30 disabled:hover:bg-transparent focus:outline-none select-none"
-                          aria-label="Decrease quantity"
-                        >
-                          −
-                        </button>
-                        <div className="px-3 min-w-[70px] text-center text-sm font-bold text-ink select-none">
-                          {formatCases(line.qty || 1, lang)}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleUpdateLineQty(idx, (line.qty || 1) + 1)}
-                          className="w-12 h-12 flex items-center justify-center text-ink text-lg font-bold hover:bg-gray-100 active:bg-gray-200 transition-colors focus:outline-none select-none"
-                          aria-label="Increase quantity"
-                        >
-                          +
-                        </button>
-                      </div>
+                      <QuantityStepper
+                        qty={line.qty || 1}
+                        onUpdate={(newQty) => handleUpdateLineQty(idx, newQty)}
+                        lang={lang}
+                        min={1}
+                        variant="white"
+                        ariaLabel={line.original_words}
+                      />
 
                       <button
                         type="button"
                         onClick={() => handleRemoveLine(idx)}
-                        className="min-tap text-sm text-ink-muted hover:text-red-600 underline font-medium focus:outline-none"
+                        className="min-tap w-11 h-11 rounded-xl text-red-500 hover:text-red-700 hover:bg-red-50 active:bg-red-100 flex items-center justify-center transition-colors focus:outline-none select-none"
+                        aria-label={`${t.remove} ${line.original_words || ''}`}
+                        title={t.remove}
                       >
-                        {t.remove}
+                        <svg
+                          className="w-5 h-5 text-red-500"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          viewBox="0 0 24 24"
+                          aria-hidden="true"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                          />
+                        </svg>
                       </button>
                     </div>
                   )}
 
                   {/* Nudge as one line of green sentence-case text (fixed min-height to maintain stable layout) */}
                   {!isOutOfStock && !needsUnit && (
-                    <div className="text-xs text-primary font-medium flex items-center gap-1.5 min-h-[1.25rem] pt-0.5">
+                    <div className="text-small text-primary font-medium flex items-center gap-1.5 min-h-[1.25rem] pt-0.5">
                       {ql?.nudges && ql.nudges.length > 0 ? (
                         <>
                           <svg className="w-3.5 h-3.5 shrink-0 text-primary" fill="currentColor" viewBox="0 0 20 20">
@@ -800,13 +801,13 @@ export const OrderByMessage: React.FC<OrderByMessageProps> = ({
           {/* Empty state if all items removed */}
           {editableLines.length === 0 && (
             <div className="p-8 text-center bg-white border border-border rounded-xl space-y-3 mb-5">
-              <p className="text-sm text-ink-muted">
+              <p className="text-body text-ink-muted">
                 {lang === 'hi' ? 'कोई सामान नहीं बचा।' : 'No items left in this order.'}
               </p>
               <button
                 type="button"
                 onClick={() => setStep('input')}
-                className="min-tap px-4 py-2 rounded-lg bg-primary text-white text-sm font-semibold"
+                className="min-tap px-4 py-2 rounded-lg bg-primary text-white text-body font-semibold"
               >
                 {t.edit_text_btn}
               </button>
@@ -816,23 +817,23 @@ export const OrderByMessage: React.FC<OrderByMessageProps> = ({
           {/* 6. Summary card */}
           {editableLines.length > 0 && (
             <div className="p-4 bg-white border border-border rounded-xl space-y-2 mb-4">
-              <div className="flex justify-between text-sm text-ink-muted">
+              <div className="flex justify-between text-small text-ink-muted">
                 <span>{lang === 'hi' ? 'उप-कुल (सबटोटल)' : 'Subtotal'}</span>
-                <span className="font-semibold text-ink">{formatINR(quoteSubtotal)}</span>
+                <span className="text-price font-bold tabular-nums text-ink">{formatINR(quoteSubtotal)}</span>
               </div>
 
-              <div className="flex justify-between text-sm text-ink-muted">
+              <div className="flex justify-between text-small text-ink-muted">
                 <span>{lang === 'hi' ? 'जीएसटी' : 'GST'}</span>
-                <span className="font-semibold text-ink">{formatINR(quoteGst)}</span>
+                <span className="text-price font-bold tabular-nums text-ink">{formatINR(quoteGst)}</span>
               </div>
 
-              <div className="pt-2 border-t border-border flex justify-between text-base font-bold text-ink">
+              <div className="pt-2 border-t border-border flex justify-between text-body font-bold text-ink">
                 <span>{t.total_incl_gst}</span>
-                <span className="text-primary">{formatINR(quotePayable)}</span>
+                <span className="text-price font-bold tabular-nums text-primary">{formatINR(quotePayable)}</span>
               </div>
 
               {excludedCount > 0 && (
-                <div className="pt-2 border-t border-border text-xs text-red-600 font-medium">
+                <div className="pt-2 border-t border-border text-small text-red-600 font-medium">
                   {(excludedCount === 1 ? t.item_not_included : t.items_not_included).replace(
                     '{n}',
                     String(excludedCount)
@@ -845,7 +846,7 @@ export const OrderByMessage: React.FC<OrderByMessageProps> = ({
           {/* 7. Fixed bottom bar (safe-area aware) */}
           <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-border z-30 shadow-none pb-[env(safe-area-inset-bottom,0px)]">
             <div className="max-w-[420px] mx-auto p-4 flex flex-col gap-2">
-              <div className="text-center text-sm font-bold text-ink">
+              <div className="text-center text-small font-bold text-ink tabular-nums">
                 {validItemsCount}{' '}
                 {validItemsCount === 1
                   ? lang === 'hi'
@@ -854,7 +855,7 @@ export const OrderByMessage: React.FC<OrderByMessageProps> = ({
                   : lang === 'hi'
                   ? 'सामान'
                   : 'items'}{' '}
-                · {formatINR(quotePayable)} {lang === 'hi' ? 'जीएसटी सहित' : 'incl. GST'}
+                · <span className="text-price font-bold">{formatINR(quotePayable)}</span> {lang === 'hi' ? 'जीएसटी सहित' : 'incl. GST'}
               </div>
 
               {/* Primary Button: "Add to cart" (56px tall) */}
@@ -862,13 +863,13 @@ export const OrderByMessage: React.FC<OrderByMessageProps> = ({
                 type="button"
                 disabled={isAddToCartDisabled}
                 onClick={handleAddToCartClick}
-                className="min-tap w-full h-14 rounded-xl bg-primary text-white font-bold text-base flex items-center justify-center gap-2 hover:bg-primary-dark active:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed select-none"
+                className="min-tap w-full h-14 rounded-xl bg-primary text-white font-bold text-body flex items-center justify-center gap-2 hover:bg-primary-dark active:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed select-none"
               >
                 <span>{t.add_to_cart}</span>
               </button>
 
               {/* Note: "Nothing is ordered until you place the order." */}
-              <p className="text-xs text-ink-muted text-center">
+              <p className="text-small text-ink-muted text-center">
                 {t.nothing_ordered_until_place}
               </p>
             </div>

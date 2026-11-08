@@ -25,6 +25,10 @@ export function App() {
     return saved === 'hi' ? 'hi' : 'en';
   });
 
+  useEffect(() => {
+    document.documentElement.lang = lang;
+  }, [lang]);
+
   const toggleLanguage = () => {
     setLang((prev) => {
       const next = prev === 'en' ? 'hi' : 'en';
@@ -340,16 +344,18 @@ export function App() {
     <div className="w-full min-h-screen bg-white flex justify-center">
       {/* 420px mobile frame on desktop, 360px+ first */}
       <div className="w-full max-w-[420px] min-h-screen bg-white flex flex-col relative border-x border-border">
-        {/* Header */}
-        <Header
-          user={user}
-          lang={lang}
-          onToggleLang={toggleLanguage}
-          onLogout={handleLogout}
-          onOpenProfile={handleOpenProfile}
-          onOpenCredit={handleOpenCredit}
-          profileButtonRef={profileButtonRef}
-        />
+        {/* Header - shown on all screens except the profile page */}
+        {currentView !== 'profile' && (
+          <Header
+            user={user}
+            lang={lang}
+            onToggleLang={toggleLanguage}
+            onLogout={handleLogout}
+            onOpenProfile={handleOpenProfile}
+            onOpenCredit={handleOpenCredit}
+            profileButtonRef={profileButtonRef}
+          />
+        )}
 
         {/* Main Content Area */}
         <main className="flex-1 flex flex-col">

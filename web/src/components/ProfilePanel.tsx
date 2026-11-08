@@ -147,13 +147,14 @@ export const ProfilePanel: React.FC<ProfilePanelProps> = ({
       {/* Top Header Bar:
           - When an order is opened: ONLY show "Go back to profile" button (NO "Back to catalogue" button).
           - When on main profile: show "Back to catalogue" button.
+          - EN | हिं Language Toggle at the very top right in the go back to catalogue zone.
       */}
-      <div className="flex items-center justify-between p-3.5 border-b border-border sticky top-14 bg-surface z-10">
+      <div className="flex items-center justify-between p-3.5 border-b border-border sticky top-0 bg-surface z-10">
         {selectedOrder ? (
           <button
             type="button"
             onClick={handleBackToProfile}
-            className="min-tap -ml-2 px-2 flex items-center text-sm font-semibold text-ink hover:text-primary transition-colors focus:outline-none"
+            className="min-tap -ml-2 px-2 flex items-center text-body font-semibold text-ink hover:text-primary transition-colors focus:outline-none"
           >
             <svg
               className="w-5 h-5 mr-1"
@@ -170,7 +171,7 @@ export const ProfilePanel: React.FC<ProfilePanelProps> = ({
           <button
             type="button"
             onClick={handleBackToCatalogue}
-            className="min-tap -ml-2 px-2 flex items-center text-sm font-semibold text-ink hover:text-primary transition-colors focus:outline-none"
+            className="min-tap -ml-2 px-2 flex items-center text-body font-semibold text-ink hover:text-primary transition-colors focus:outline-none"
           >
             <svg
               className="w-5 h-5 mr-1"
@@ -185,11 +186,48 @@ export const ProfilePanel: React.FC<ProfilePanelProps> = ({
           </button>
         )}
 
-        <h2 id="profile-panel-title" className="text-base font-bold text-ink truncate px-2">
-          {selectedOrder ? `${t.order_number_label} #${selectedOrder.id}` : t.profile}
-        </h2>
+        {selectedOrder && (
+          <h2 id="profile-panel-title" className="text-body font-bold text-ink truncate px-2 tabular-nums">
+            {t.order_number_label} #{selectedOrder.id}
+          </h2>
+        )}
 
-        <div className="w-10 shrink-0" />
+        {/* Language selector EN | हिं at the very top in the go back to catalogue zone */}
+        <div
+          className="border border-border rounded-xl p-0.5 inline-flex items-center bg-white h-9 select-none shrink-0"
+          role="group"
+          aria-label="Language selector"
+        >
+          <button
+            type="button"
+            onClick={() => {
+              if (lang !== 'en') onToggleLang();
+            }}
+            className={`min-w-[36px] h-8 px-2 flex items-center justify-center text-body font-bold rounded-lg transition-colors ${
+              lang === 'en'
+                ? 'bg-primary text-white'
+                : 'text-ink-muted hover:text-ink bg-transparent'
+            }`}
+            aria-pressed={lang === 'en'}
+          >
+            EN
+          </button>
+          <span className="text-border px-0.5 text-small select-none">|</span>
+          <button
+            type="button"
+            onClick={() => {
+              if (lang !== 'hi') onToggleLang();
+            }}
+            className={`min-w-[36px] h-8 px-2 flex items-center justify-center text-body font-bold rounded-lg transition-colors ${
+              lang === 'hi'
+                ? 'bg-primary text-white'
+                : 'text-ink-muted hover:text-ink bg-transparent'
+            }`}
+            aria-pressed={lang === 'hi'}
+          >
+            हिं
+          </button>
+        </div>
       </div>
 
       {/* If viewing single order detail */}
@@ -197,11 +235,11 @@ export const ProfilePanel: React.FC<ProfilePanelProps> = ({
         <div className="p-4 space-y-4">
           <div className="bg-surface border border-border rounded-xl p-4 space-y-3">
             <div className="flex justify-between items-center border-b border-border pb-2.5">
-              <span className="text-xs text-ink-muted">
+              <span className="text-small text-ink-muted tabular-nums">
                 {t.order_number_label} #{selectedOrder.id}
               </span>
               <span
-                className={`text-xs font-bold px-2.5 py-0.5 rounded-full capitalize ${
+                className={`text-small font-bold px-2.5 py-0.5 rounded-full capitalize ${
                   selectedOrder.status === 'approved'
                     ? 'bg-[#E8F5E9] text-[#0C6B1A]'
                     : selectedOrder.status === 'credit_hold'
@@ -215,22 +253,22 @@ export const ProfilePanel: React.FC<ProfilePanelProps> = ({
               </span>
             </div>
 
-            <div className="flex justify-between text-xs">
+            <div className="flex justify-between text-small">
               <span className="text-ink-muted">{t.order_date_label}</span>
-              <span className="font-medium text-ink">
+              <span className="font-medium text-ink tabular-nums">
                 {formatDate(selectedOrder.created_at, lang)}
               </span>
             </div>
 
-            <div className="flex justify-between text-sm font-bold pt-1 border-t border-border">
-              <span>{t.order_total_label}</span>
-              <span className="text-primary">{formatINR(selectedOrder.total)}</span>
+            <div className="flex justify-between items-baseline pt-1 border-t border-border">
+              <span className="text-body font-bold text-ink">{t.order_total_label}</span>
+              <span className="text-price font-bold tabular-nums text-primary">{formatINR(selectedOrder.total)}</span>
             </div>
 
             {/* Order Items: Shows image along with name, breakdown & line total */}
             {selectedOrder.lines && selectedOrder.lines.length > 0 && (
               <div className="pt-2 border-t border-border space-y-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-ink-muted">
+                <span className="text-small font-bold uppercase tracking-wider text-ink-muted tabular-nums">
                   {t.order_lines_label} ({selectedOrder.lines.length})
                 </span>
                 <div className="space-y-2">
@@ -252,10 +290,10 @@ export const ProfilePanel: React.FC<ProfilePanelProps> = ({
 
                         {/* Product Info: Name, Cases count & free goods */}
                         <div className="flex flex-col min-w-0 flex-1">
-                          <span className="font-bold text-ink text-xs truncate">
+                          <span className="font-semibold text-ink text-body truncate">
                             {displayName}
                           </span>
-                          <div className="text-[11px] text-ink-muted flex items-center gap-1.5 flex-wrap">
+                          <div className="text-small text-ink-muted flex items-center gap-1.5 flex-wrap tabular-nums">
                             <span>
                               {l.qty_cases} {l.qty_cases === 1 ? t.case_singular : t.cases}
                             </span>
@@ -271,7 +309,7 @@ export const ProfilePanel: React.FC<ProfilePanelProps> = ({
                         </div>
 
                         {/* Line Total */}
-                        <span className="font-bold text-ink text-xs shrink-0 text-right">
+                        <span className="text-price font-bold tabular-nums text-ink shrink-0 text-right">
                           {formatINR(l.line_total)}
                         </span>
                       </div>
@@ -288,7 +326,7 @@ export const ProfilePanel: React.FC<ProfilePanelProps> = ({
                   type="button"
                   onClick={() => handleCancelOrder(selectedOrder.id)}
                   disabled={cancellingOrderId === selectedOrder.id}
-                  className="w-full min-tap h-12 rounded-xl border border-error text-error font-bold text-sm flex items-center justify-center hover:bg-error-bg active:bg-error-bg transition-colors focus:outline-none disabled:opacity-50"
+                  className="w-full min-tap h-12 rounded-xl border border-error text-error font-bold text-body flex items-center justify-center hover:bg-error-bg active:bg-error-bg transition-colors focus:outline-none disabled:opacity-50"
                 >
                   {cancellingOrderId === selectedOrder.id ? (
                     <span>{t.cancelling_order}</span>
@@ -305,7 +343,7 @@ export const ProfilePanel: React.FC<ProfilePanelProps> = ({
             )}
 
             {cancelSuccessMessage && (
-              <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-xs font-semibold text-[#0C6B1A]">
+              <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-small font-semibold text-[#0C6B1A]">
                 {cancelSuccessMessage}
               </div>
             )}
@@ -335,13 +373,13 @@ export const ProfilePanel: React.FC<ProfilePanelProps> = ({
 
             {/* Shop name & login phone number beside the logo */}
             <div className="min-w-0 flex-1">
-              <div className="text-xs font-semibold text-ink-muted leading-tight">
+              <div className="text-small font-semibold text-ink-muted leading-tight">
                 {t.retailer_label}
               </div>
-              <div className="text-base font-bold text-ink truncate leading-snug">
+              <div className="text-body font-bold text-ink truncate leading-snug">
                 {user.retailer_name || user.name || t.retailer_label}
               </div>
-              <div className="text-xs text-ink-muted truncate">
+              <div className="text-small text-ink-muted truncate tabular-nums">
                 {user.phone || t.mobile_number}
               </div>
             </div>
@@ -351,17 +389,17 @@ export const ProfilePanel: React.FC<ProfilePanelProps> = ({
           {user.salesman_name && (
             <div className="p-4 border-b border-border bg-gray-50 flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <div className="text-[11px] font-medium text-ink-muted">
+                <div className="text-small font-medium text-ink-muted">
                   {t.your_salesman}
                 </div>
-                <div className="text-sm font-bold text-ink truncate">
+                <div className="text-body font-bold text-ink truncate">
                   {user.salesman_name}
                 </div>
               </div>
               {user.salesman_phone && (
                 <a
                   href={`tel:${user.salesman_phone}`}
-                  className="min-tap px-3 py-2 rounded-xl bg-primary text-white text-xs font-bold flex items-center gap-1.5 hover:bg-primary-dark active:bg-primary-dark transition-colors shrink-0 select-none"
+                  className="min-tap px-3 py-2 rounded-xl bg-primary text-white text-body font-bold flex items-center gap-1.5 hover:bg-primary-dark active:bg-primary-dark transition-colors shrink-0 select-none"
                   aria-label={`${t.call_btn} ${user.salesman_name}`}
                 >
                   <svg
@@ -387,28 +425,28 @@ export const ProfilePanel: React.FC<ProfilePanelProps> = ({
           {/* d) Credit card: Credit limit, Outstanding, Available, thin progress bar */}
           <div ref={creditCardRef} className="p-4 border-b border-border space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-ink-muted">
+              <span className="text-small font-bold uppercase tracking-wider text-ink-muted">
                 {t.credit_card_title}
               </span>
               {user.credit_low && (
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
+                <span className="text-small font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
                   Credit Low
                 </span>
               )}
             </div>
 
             <div className="bg-white border border-border rounded-xl p-3.5 space-y-2.5">
-              <div className="flex justify-between items-center text-xs">
+              <div className="flex justify-between items-center text-small">
                 <span className="text-ink-muted">{t.credit_limit_label}</span>
-                <span className="font-bold text-ink">{formatINR(creditLimitNum)}</span>
+                <span className="text-price font-bold tabular-nums text-ink">{formatINR(creditLimitNum)}</span>
               </div>
-              <div className="flex justify-between items-center text-xs">
+              <div className="flex justify-between items-center text-small">
                 <span className="text-ink-muted">{t.outstanding_label}</span>
-                <span className="font-bold text-ink">{formatINR(outstandingNum)}</span>
+                <span className="text-price font-bold tabular-nums text-ink">{formatINR(outstandingNum)}</span>
               </div>
-              <div className="flex justify-between items-center text-sm font-bold pt-1 border-t border-border">
-                <span>{t.available_label}</span>
-                <span className={user.credit_low ? 'text-amber-700' : 'text-primary'}>
+              <div className="flex justify-between items-baseline pt-1 border-t border-border">
+                <span className="text-body font-bold text-ink">{t.available_label}</span>
+                <span className={`text-price font-bold tabular-nums ${user.credit_low ? 'text-amber-700' : 'text-primary'}`}>
                   {formatINR(availableCreditNum)}
                 </span>
               </div>
@@ -427,9 +465,8 @@ export const ProfilePanel: React.FC<ProfilePanelProps> = ({
                     aria-valuemax={100}
                   />
                 </div>
-                <div className="flex justify-between items-center text-[10px] text-ink-muted mt-1">
+                <div className="text-small text-ink-muted mt-1 tabular-nums">
                   <span>{Math.round(usedRatio * 100)}% {t.used_credit}</span>
-                  <span>{formatINR(availableCreditNum)} {t.credit_left}</span>
                 </div>
               </div>
             </div>
@@ -441,7 +478,7 @@ export const ProfilePanel: React.FC<ProfilePanelProps> = ({
                   type="button"
                   onClick={handlePayOutstanding}
                   disabled={isPayingOutstanding}
-                  className="w-full min-tap h-12 rounded-xl bg-primary text-white font-bold text-sm flex items-center justify-center gap-2 hover:bg-primary-dark active:bg-primary-dark transition-colors focus:outline-none disabled:opacity-50 select-none shadow-none cursor-pointer"
+                  className="w-full min-tap h-12 rounded-xl bg-primary text-white font-bold text-body flex items-center justify-center gap-2 hover:bg-primary-dark active:bg-primary-dark transition-colors focus:outline-none disabled:opacity-50 select-none shadow-none cursor-pointer"
                 >
                   {isPayingOutstanding ? (
                     <span>{t.paying_outstanding}</span>
@@ -458,7 +495,7 @@ export const ProfilePanel: React.FC<ProfilePanelProps> = ({
                   )}
                 </button>
               ) : (
-                <div className="w-full h-11 rounded-xl bg-gray-50 border border-border flex items-center justify-center text-xs font-semibold text-ink-muted gap-1.5">
+                <div className="w-full h-11 rounded-xl bg-gray-50 border border-border flex items-center justify-center text-small font-semibold text-ink-muted gap-1.5">
                   <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                   </svg>
@@ -467,7 +504,7 @@ export const ProfilePanel: React.FC<ProfilePanelProps> = ({
               )}
 
               {paymentSuccessMessage && (
-                <div className="mt-2.5 p-3 bg-green-50 border border-green-200 rounded-xl text-xs font-semibold text-[#0C6B1A] flex items-center gap-2">
+                <div className="mt-2.5 p-3 bg-green-50 border border-green-200 rounded-xl text-small font-semibold text-[#0C6B1A] flex items-center gap-2">
                   <svg className="w-4 h-4 shrink-0 text-primary" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                   </svg>
@@ -475,7 +512,7 @@ export const ProfilePanel: React.FC<ProfilePanelProps> = ({
                 </div>
               )}
               {paymentError && (
-                <div className="mt-2.5 p-3 bg-red-50 border border-red-200 rounded-xl text-xs font-semibold text-error flex items-center gap-2">
+                <div className="mt-2.5 p-3 bg-red-50 border border-red-200 rounded-xl text-small font-semibold text-error flex items-center gap-2">
                   <svg className="w-4 h-4 shrink-0 text-error" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                     <circle cx="12" cy="12" r="10" />
                     <line x1="12" y1="8" x2="12" y2="12" />
@@ -490,29 +527,29 @@ export const ProfilePanel: React.FC<ProfilePanelProps> = ({
           {/* e) Recent orders from GET /orders/mine?limit=3 with small product images side by side */}
           <div className="p-4 border-b border-border space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-ink-muted">
+              <span className="text-small font-bold uppercase tracking-wider text-ink-muted">
                 {isViewingAllOrders ? (lang === 'hi' ? 'सभी ऑर्डर' : 'All Orders') : t.recent_orders}
               </span>
             </div>
 
             {ordersLoading ? (
-              <div className="flex items-center justify-center py-6 text-xs text-ink-muted">
+              <div className="flex items-center justify-center py-6 text-small text-ink-muted">
                 <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2" />
                 <span>{t.loading}</span>
               </div>
             ) : ordersError ? (
               <div className="p-3 bg-red-50 border border-red-200 rounded-xl space-y-2 text-center">
-                <p className="text-xs text-error font-medium">{ordersError}</p>
+                <p className="text-small text-error font-medium">{ordersError}</p>
                 <button
                   type="button"
                   onClick={() => loadOrders(isViewingAllOrders)}
-                  className="min-tap px-4 py-1.5 text-xs font-bold rounded-lg bg-primary text-white hover:bg-primary-dark transition-colors inline-block"
+                  className="min-tap px-4 py-1.5 text-body font-bold rounded-lg bg-primary text-white hover:bg-primary-dark transition-colors inline-block"
                 >
                   {t.retry}
                 </button>
               </div>
             ) : orders.length === 0 ? (
-              <div className="py-6 text-center text-xs text-ink-muted bg-gray-50 rounded-xl border border-dashed border-border">
+              <div className="py-6 text-center text-small text-ink-muted bg-gray-50 rounded-xl border border-dashed border-border">
                 {t.no_orders_yet}
               </div>
             ) : (
@@ -528,11 +565,11 @@ export const ProfilePanel: React.FC<ProfilePanelProps> = ({
                     className="w-full text-left p-3.5 rounded-xl border border-border bg-white hover:border-primary focus:border-primary focus:outline-none transition-colors select-none space-y-2"
                   >
                     <div className="flex justify-between items-center">
-                      <span className="text-xs font-bold text-ink">
+                      <span className="text-body font-bold text-ink tabular-nums">
                         {t.order_number_label} #{order.id}
                       </span>
                       <span
-                        className={`text-[11px] font-bold px-2 py-0.5 rounded-full capitalize ${
+                        className={`text-small font-bold px-2 py-0.5 rounded-full capitalize ${
                           order.status === 'approved'
                             ? 'bg-[#E8F5E9] text-[#0C6B1A]'
                             : order.status === 'credit_hold'
@@ -562,15 +599,15 @@ export const ProfilePanel: React.FC<ProfilePanelProps> = ({
                             />
                           </div>
                         ))}
-                        <span className="text-[11px] text-ink-muted pl-1 shrink-0">
+                        <span className="text-small text-ink-muted pl-1 shrink-0 tabular-nums">
                           {order.lines.length} {order.lines.length === 1 ? (lang === 'hi' ? 'सामान' : 'item') : (lang === 'hi' ? 'सामान' : 'items')}
                         </span>
                       </div>
                     )}
 
-                    <div className="flex justify-between items-center text-xs text-ink-muted pt-1 border-t border-border/40">
-                      <span>{formatDate(order.created_at, lang)}</span>
-                      <span className="font-bold text-ink text-sm">
+                    <div className="flex justify-between items-center text-small text-ink-muted pt-1 border-t border-border/40">
+                      <span className="tabular-nums">{formatDate(order.created_at, lang)}</span>
+                      <span className="text-price font-bold tabular-nums text-ink">
                         {formatINR(order.total)}
                       </span>
                     </div>
@@ -585,7 +622,7 @@ export const ProfilePanel: React.FC<ProfilePanelProps> = ({
                       setIsViewingAllOrders(true);
                       loadOrders(true);
                     }}
-                    className="w-full min-tap h-11 rounded-xl border border-border bg-white hover:bg-gray-50 active:bg-gray-100 text-primary text-xs font-bold flex items-center justify-center gap-1.5 transition-colors focus:outline-none cursor-pointer"
+                    className="w-full min-tap h-11 rounded-xl border border-border bg-white hover:bg-gray-50 active:bg-gray-100 text-primary text-body font-bold flex items-center justify-center gap-1.5 transition-colors focus:outline-none cursor-pointer"
                   >
                     <span>{t.view_all_orders}</span>
                     <svg
@@ -603,48 +640,6 @@ export const ProfilePanel: React.FC<ProfilePanelProps> = ({
             )}
           </div>
 
-          {/* f) Language switch EN | हिं */}
-          <div className="p-4 border-b border-border flex items-center justify-between">
-            <span className="text-sm font-semibold text-ink">
-              {lang === 'hi' ? 'भाषा (Language)' : 'Language'}
-            </span>
-            <div
-              className="border border-border rounded-xl p-0.5 inline-flex items-center bg-white h-9 select-none"
-              role="group"
-              aria-label="Language selector"
-            >
-              <button
-                type="button"
-                onClick={() => {
-                  if (lang !== 'en') onToggleLang();
-                }}
-                className={`w-9 h-7 flex items-center justify-center text-xs font-bold rounded-lg transition-colors ${
-                  lang === 'en'
-                    ? 'bg-primary text-white'
-                    : 'text-ink-muted hover:text-ink bg-transparent'
-                }`}
-                aria-pressed={lang === 'en'}
-              >
-                EN
-              </button>
-              <span className="text-border px-0.5 text-xs select-none">|</span>
-              <button
-                type="button"
-                onClick={() => {
-                  if (lang !== 'hi') onToggleLang();
-                }}
-                className={`w-9 h-7 flex items-center justify-center text-xs font-bold rounded-lg transition-colors ${
-                  lang === 'hi'
-                    ? 'bg-primary text-white'
-                    : 'text-ink-muted hover:text-ink bg-transparent'
-                }`}
-                aria-pressed={lang === 'hi'}
-              >
-                हिं
-              </button>
-            </div>
-          </div>
-
           {/* g) Full-width outlined "Log out" button */}
           <div className="p-4 mt-auto">
             <button
@@ -653,7 +648,7 @@ export const ProfilePanel: React.FC<ProfilePanelProps> = ({
                 handleBackToCatalogue();
                 onLogout();
               }}
-              className="w-full min-tap h-12 rounded-xl border border-error text-error font-bold text-sm flex items-center justify-center hover:bg-error-bg active:bg-error-bg transition-colors focus:outline-none"
+              className="w-full min-tap h-12 rounded-xl border border-error text-error font-bold text-body flex items-center justify-center hover:bg-error-bg active:bg-error-bg transition-colors focus:outline-none"
             >
               <svg
                 className="w-4 h-4 mr-2"

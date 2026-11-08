@@ -144,10 +144,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         // ================= STEP 1: MOBILE NUMBER =================
         <section className="flex flex-col w-full">
           <div className="mb-6">
-            <h1 className="text-2xl font-bold text-ink leading-tight mb-2">
+            <h1 className="text-title font-bold text-ink leading-tight mb-2">
               {t.login_title}
             </h1>
-            <p className="text-sm text-ink-muted leading-relaxed">
+            <p className="text-body text-ink-muted leading-relaxed">
               {t.login_subtitle}
             </p>
           </div>
@@ -155,14 +155,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           <form onSubmit={handleSendOTP} className="flex flex-col w-full">
             <label
               htmlFor="mobile-number"
-              className="text-sm font-semibold text-ink mb-2 block"
+              className="text-body font-semibold text-ink mb-2 block"
             >
               {t.mobile_number}
             </label>
 
             <div className="flex items-center gap-2.5 w-full h-14 mb-3">
               {/* Country Code Prefix */}
-              <div className="min-w-[64px] w-[64px] h-14 flex items-center justify-center bg-gray-50 border border-border rounded-xl font-bold text-ink select-none">
+              <div className="min-w-[64px] w-[64px] h-14 flex items-center justify-center bg-gray-50 border border-border rounded-xl font-bold text-body text-ink select-none">
                 +91
               </div>
 
@@ -181,7 +181,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 placeholder={t.phone_placeholder}
                 className={`flex-1 h-14 bg-surface border ${
                   phoneError ? 'border-error bg-error-bg/10' : 'border-border'
-                } rounded-xl px-4 text-base font-medium text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none transition-colors`}
+                } rounded-xl px-4 text-body font-medium text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none transition-colors`}
                 autoFocus
                 required
               />
@@ -190,7 +190,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             {/* Error Message Banner */}
             {phoneError && (
               <div
-                className="mb-4 p-3 bg-error-bg/30 border border-error/30 rounded-xl flex items-start gap-2 text-error text-xs leading-relaxed"
+                className="mb-4 p-3 bg-error-bg/30 border border-error/30 rounded-xl flex items-start gap-2 text-error text-small leading-relaxed"
                 role="alert"
               >
                 <svg
@@ -212,14 +212,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             <button
               type="submit"
               disabled={loading || phone.trim().length !== 10}
-              className="min-tap w-full h-14 rounded-xl bg-primary text-white font-bold text-base flex items-center justify-center border-0 active:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed select-none"
+              className="min-tap w-full h-14 rounded-xl bg-primary text-white font-bold text-body flex items-center justify-center border-0 active:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed select-none"
             >
               {t.send_otp}
             </button>
           </form>
 
           {/* Quick Demo Helper */}
-          <div className="mt-8 p-3 bg-gray-50 border border-border rounded-xl text-xs text-ink-muted space-y-1">
+          <div className="mt-8 p-3 bg-gray-50 border border-border rounded-xl text-small text-ink-muted space-y-1">
             <div className="font-semibold text-ink">Demo Accounts:</div>
             <div>• 9826011111 (Gupta Kirana Store)</div>
             <div>• 9826022222 (Sharma Provision Store)</div>
@@ -229,10 +229,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         // ================= STEP 2: 6-DIGIT OTP =================
         <section className="flex flex-col w-full">
           <div className="mb-6">
-            <h1 className="text-2xl font-bold text-ink leading-tight mb-2">
+            <h1 className="text-title font-bold text-ink leading-tight mb-2">
               {t.enter_code}
             </h1>
-            <p className="text-sm text-ink-muted leading-relaxed">
+            <p className="text-body text-ink-muted leading-relaxed">
               {t.code_sent_to}{' '}
               <span className="font-semibold text-ink">+91 {phone}</span>
             </p>
@@ -261,7 +261,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                     value={digit}
                     onChange={(e) => handleOtpChange(idx, e.target.value)}
                     onKeyDown={(e) => handleOtpKeyDown(idx, e)}
-                    className="w-full h-full text-center text-xl font-bold text-ink bg-transparent outline-none border-none p-0 focus:ring-0"
+                    className="w-full h-full text-center text-price font-bold tabular-nums text-ink bg-transparent outline-none border-none p-0 focus:ring-0"
                     aria-label={`Digit ${idx + 1}`}
                   />
                 </div>
@@ -269,7 +269,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             </div>
 
             {/* Demo Hint Line */}
-            <div className="mb-4 flex items-center justify-between text-xs text-ink-muted">
+            <div className="mb-4 flex items-center justify-between text-small text-ink-muted">
               <span>{t.demo_code_hint}</span>
               <button
                 type="button"
@@ -283,7 +283,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             {/* Error Message */}
             {otpError && (
               <div
-                className="mb-4 p-3 bg-error-bg/30 border border-error/30 rounded-xl flex items-start gap-2 text-error text-xs leading-relaxed"
+                className="mb-4 p-3 bg-error-bg/30 border border-error/30 rounded-xl flex items-start gap-2 text-error text-small leading-relaxed"
                 role="alert"
               >
                 <svg
@@ -305,13 +305,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             <button
               type="submit"
               disabled={loading || otp.join('').length !== 6}
-              className="min-tap w-full h-14 rounded-xl bg-primary text-white font-bold text-base flex items-center justify-center border-0 active:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed select-none mb-4"
+              className="min-tap w-full h-14 rounded-xl bg-primary text-white font-bold text-body flex items-center justify-center border-0 active:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed select-none mb-4"
             >
               {loading ? t.submitting : t.verify}
             </button>
 
             {/* Footer Navigation: Resend & Change Number */}
-            <div className="flex items-center justify-between w-full px-0.5 text-xs text-ink-muted">
+            <div className="flex items-center justify-between w-full px-0.5 text-small text-ink-muted">
               {resendSeconds > 0 ? (
                 <span>
                   {t.resend_in.replace('{s}', resendSeconds.toString())}

@@ -7,6 +7,7 @@ import { formatINRPill } from '../utils';
 export interface HeaderProps {
   user: UserMe | null;
   lang: Language;
+  isProfile?: boolean;
   onToggleLang: () => void;
   onLogout: () => void;
   onOpenProfile?: () => void;
@@ -17,6 +18,7 @@ export interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   user,
   lang,
+  isProfile,
   onToggleLang,
   onOpenProfile,
   onOpenCredit,
@@ -33,15 +35,17 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Left Side */}
       <div className="flex flex-col min-w-0 pr-2 flex-1 justify-center">
         {!user ? (
-          <span className="font-bold text-lg text-ink tracking-tight">
+          <span className="font-bold text-title text-ink tracking-tight">
             {t.company_name}
           </span>
         ) : (
           <>
-            <span className="text-[11px] font-medium text-ink-muted leading-tight truncate">
-              {t.ordering_from}
-            </span>
-            <h1 className="text-base font-bold text-ink leading-tight truncate">
+            {!isProfile && (
+              <span className="text-small font-medium text-ink-muted leading-tight truncate">
+                {t.ordering_from}
+              </span>
+            )}
+            <h1 className="text-small font-bold text-ink leading-tight truncate">
               {user.retailer_name || user.name || t.retailer_label}
             </h1>
           </>
@@ -62,7 +66,7 @@ export const Header: React.FC<HeaderProps> = ({
               onClick={() => {
                 if (lang !== 'en') onToggleLang();
               }}
-              className={`w-9 h-7 flex items-center justify-center text-xs font-bold rounded-lg transition-colors ${
+              className={`min-w-[36px] h-8 px-2 flex items-center justify-center text-body font-bold rounded-lg transition-colors ${
                 lang === 'en'
                   ? 'bg-primary text-white'
                   : 'text-ink-muted hover:text-ink bg-transparent'
@@ -71,13 +75,13 @@ export const Header: React.FC<HeaderProps> = ({
             >
               EN
             </button>
-            <span className="text-border px-0.5 text-xs select-none">|</span>
+            <span className="text-border px-0.5 text-small select-none">|</span>
             <button
               type="button"
               onClick={() => {
                 if (lang !== 'hi') onToggleLang();
               }}
-              className={`w-9 h-7 flex items-center justify-center text-xs font-bold rounded-lg transition-colors ${
+              className={`min-w-[36px] h-8 px-2 flex items-center justify-center text-body font-bold rounded-lg transition-colors ${
                 lang === 'hi'
                   ? 'bg-primary text-white'
                   : 'text-ink-muted hover:text-ink bg-transparent'
@@ -96,7 +100,7 @@ export const Header: React.FC<HeaderProps> = ({
                   e.stopPropagation();
                   onOpenCredit?.();
                 }}
-                className={`min-tap h-12 px-3 rounded-xl select-none transition-colors border flex items-center gap-1.5 text-xs font-bold shrink-0 ${
+                className={`h-8 px-2.5 rounded-xl select-none transition-colors border flex items-center gap-1.5 text-micro font-bold tabular-nums shrink-0 ${
                   user.credit_low
                     ? 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200 active:bg-amber-200'
                     : 'bg-[#E8F5E9] text-[#0C6B1A] border-green-200 hover:bg-green-100 active:bg-green-100'
@@ -104,7 +108,7 @@ export const Header: React.FC<HeaderProps> = ({
                 aria-label={`${availableCreditText} ${t.credit_left}`}
               >
                 <svg
-                  className="w-4 h-4 shrink-0"
+                  className="w-3.5 h-3.5 shrink-0"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="2"

@@ -10,6 +10,7 @@ import {
   formatCases,
 } from '../utils';
 import { ProductImage } from './ProductImage';
+import { QuantityStepper } from './QuantityStepper';
 
 interface CartViewProps {
   lang: Language;
@@ -122,7 +123,7 @@ export const CartView: React.FC<CartViewProps> = ({
           <button
             type="button"
             onClick={onBackToCatalogue}
-            className="min-tap -ml-2 px-2 flex items-center text-sm font-semibold text-ink hover:text-primary transition-colors focus:outline-none"
+            className="min-tap -ml-2 px-2 flex items-center text-body font-semibold text-ink hover:text-primary transition-colors focus:outline-none"
             aria-label={t.back_to_catalogue}
           >
             <svg
@@ -155,16 +156,16 @@ export const CartView: React.FC<CartViewProps> = ({
               />
             </svg>
           </div>
-          <h2 className="text-base font-bold text-ink mb-1">
+          <h2 className="text-title font-bold text-ink mb-1">
             {t.empty_cart_title}
           </h2>
-          <p className="text-xs text-ink-muted max-w-xs mb-6">
+          <p className="text-small text-ink-muted max-w-xs mb-6">
             {t.empty_cart_subtitle}
           </p>
           <button
             type="button"
             onClick={onBackToCatalogue}
-            className="min-tap px-6 py-3 rounded-xl bg-primary text-white font-semibold text-sm hover:bg-primary-dark transition-colors"
+            className="min-tap px-6 py-3 rounded-xl bg-primary text-white font-semibold text-body hover:bg-primary-dark transition-colors"
           >
             {t.back_to_catalogue}
           </button>
@@ -180,7 +181,7 @@ export const CartView: React.FC<CartViewProps> = ({
         <button
           type="button"
           onClick={onBackToCatalogue}
-          className="min-tap -ml-2 px-2 flex items-center text-sm font-semibold text-ink hover:text-primary transition-colors focus:outline-none"
+          className="min-tap -ml-2 px-2 flex items-center text-body font-semibold text-ink hover:text-primary transition-colors focus:outline-none"
         >
           <svg
             className="w-5 h-5 mr-1"
@@ -194,18 +195,18 @@ export const CartView: React.FC<CartViewProps> = ({
           <span>{t.back_to_catalogue}</span>
         </button>
 
-        <span className="text-xs font-semibold text-ink-muted">
+        <span className="text-small font-semibold text-ink-muted">
           {totalItemCount} {totalItemCount === 1 ? t.item : t.items}
         </span>
       </div>
 
       {/* Screen Title (with guaranteed top clearance from sticky header) */}
       <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-xl font-bold text-ink">
+        <h1 className="text-title font-bold text-ink">
           {t.cart} ({totalItemCount} {totalItemCount === 1 ? t.item : t.items})
         </h1>
         {quoteLoading && (
-          <span className="text-xs text-primary font-medium flex items-center gap-1">
+          <span className="text-small text-primary font-medium flex items-center gap-1">
             <svg
               className="animate-spin h-3.5 w-3.5 text-primary"
               xmlns="http://www.w3.org/2000/svg"
@@ -233,7 +234,7 @@ export const CartView: React.FC<CartViewProps> = ({
 
       {/* Message Note: e.g. "2 items added from your message" */}
       {cartMessageNote && (
-        <div className="mb-4 p-3 rounded-xl bg-primary-50 border border-primary/20 text-xs font-semibold text-primary flex items-center justify-between gap-2 select-none">
+        <div className="mb-4 p-3 rounded-xl bg-primary-50 border border-primary/20 text-small font-semibold text-primary flex items-center justify-between gap-2 select-none">
           <div className="flex items-center gap-2">
             <svg className="w-4 h-4 text-primary shrink-0" fill="currentColor" viewBox="0 0 20 20">
               <path
@@ -248,7 +249,7 @@ export const CartView: React.FC<CartViewProps> = ({
             <button
               type="button"
               onClick={onDismissMessageNote}
-              className="text-primary hover:text-primary-dark font-bold text-base leading-none p-1"
+              className="text-primary hover:text-primary-dark font-bold text-body leading-none p-1"
               aria-label="Dismiss note"
             >
               ×
@@ -260,7 +261,7 @@ export const CartView: React.FC<CartViewProps> = ({
       {/* Inline Order Error (with Retry) */}
       {orderError && (
         <div
-          className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2 text-red-700 text-xs"
+          className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2 text-red-700 text-small"
           role="alert"
         >
           <svg
@@ -280,7 +281,7 @@ export const CartView: React.FC<CartViewProps> = ({
           <button
             type="button"
             onClick={handlePlaceOrder}
-            className="min-tap text-xs font-bold text-red-700 underline shrink-0"
+            className="min-tap text-body font-bold text-red-700 underline shrink-0"
           >
             {t.retry}
           </button>
@@ -307,10 +308,10 @@ export const CartView: React.FC<CartViewProps> = ({
                     <ProductImage skuCode={line.sku_code} alt={cleanProductName(line.name)} />
                   </div>
                   <div className="flex flex-col min-w-0 flex-1">
-                    <h2 className="text-sm font-semibold text-ink leading-tight">
+                    <h2 className="text-body font-semibold text-ink leading-tight">
                       {cleanProductName(line.name)}
                     </h2>
-                    <div className="text-xs text-ink-muted mt-0.5">
+                    <div className="text-small text-ink-muted mt-0.5 tabular-nums">
                       {formatINR(line.case_price)} / {t.per_case}{' '}
                       {sku && (
                         <span>
@@ -325,7 +326,7 @@ export const CartView: React.FC<CartViewProps> = ({
                 {/* Line Total */}
                 <div className="text-right shrink-0">
                   <span
-                    className={`text-base font-bold ${
+                    className={`text-price font-bold tabular-nums ${
                       isBlocked ? 'text-ink-muted line-through' : 'text-ink'
                     }`}
                   >
@@ -334,44 +335,45 @@ export const CartView: React.FC<CartViewProps> = ({
                 </div>
               </div>
 
-              {/* Stepper Control (48px tall: h-12) */}
+              {/* Stepper Control with editable quantity (48px tall: h-12) */}
               <div className="flex items-center justify-between pt-1">
-                <div className="flex items-center border border-border rounded-xl h-12 bg-surface">
-                  <button
-                    type="button"
-                    onClick={() => onUpdateQty(line.sku_code, Math.max(0, line.requested_cases - 1))}
-                    className="w-12 h-12 flex items-center justify-center text-primary text-xl font-bold hover:bg-gray-100 active:bg-gray-200 rounded-l-xl transition-colors select-none focus:outline-none"
-                    aria-label={`Decrease ${line.name}`}
-                  >
-                    −
-                  </button>
-                  <span className="px-3 min-w-[70px] text-center text-sm font-bold text-ink select-none">
-                    {formatCases(line.requested_cases, lang)}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => onUpdateQty(line.sku_code, line.requested_cases + 1)}
-                    disabled={isBlocked}
-                    className="w-12 h-12 flex items-center justify-center text-primary text-xl font-bold hover:bg-gray-100 active:bg-gray-200 rounded-r-xl transition-colors select-none disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none"
-                    aria-label={`Increase ${line.name}`}
-                  >
-                    +
-                  </button>
-                </div>
+                <QuantityStepper
+                  qty={line.requested_cases}
+                  onUpdate={(newQty) => onUpdateQty(line.sku_code, newQty)}
+                  lang={lang}
+                  disabled={isBlocked}
+                  variant="white"
+                  ariaLabel={cleanProductName(line.name)}
+                />
 
-                {/* Remove button */}
+                {/* Remove red bin icon button */}
                 <button
                   type="button"
                   onClick={() => onUpdateQty(line.sku_code, 0)}
-                  className="min-tap text-xs text-ink-muted hover:text-error underline py-1 px-2 font-medium"
+                  className="min-tap w-11 h-11 rounded-xl text-red-500 hover:text-red-700 hover:bg-red-50 active:bg-red-100 flex items-center justify-center transition-colors focus:outline-none select-none"
+                  aria-label={`${t.remove} ${cleanProductName(line.name)}`}
+                  title={t.remove}
                 >
-                  {t.remove}
+                  <svg
+                    className="w-5 h-5 text-red-500"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                    />
+                  </svg>
                 </button>
               </div>
 
               {/* Free Goods Badge */}
               {line.free_cases > 0 && (
-                <div className="flex items-center gap-1.5 text-primary text-xs font-semibold pt-1">
+                <div className="flex items-center gap-1.5 text-primary text-small font-semibold pt-1">
                   <svg
                     className="w-4 h-4 text-primary shrink-0"
                     fill="none"
@@ -396,7 +398,7 @@ export const CartView: React.FC<CartViewProps> = ({
 
               {/* Discount Applied Badge */}
               {parseFloat(line.discount?.toString() || '0') > 0 && (
-                <div className="flex items-center gap-1.5 text-primary text-xs font-semibold pt-1">
+                <div className="flex items-center gap-1.5 text-primary text-small font-semibold pt-1">
                   <svg
                     className="w-4 h-4 text-primary shrink-0"
                     fill="none"
@@ -422,7 +424,7 @@ export const CartView: React.FC<CartViewProps> = ({
                   {Array.from(new Set(line.nudges)).slice(0, 1).map((nudge, idx) => (
                     <div
                       key={idx}
-                      className="text-xs text-primary font-medium flex items-center gap-1.5"
+                      className="text-small text-primary font-medium flex items-center gap-1.5"
                     >
                       <svg
                         className="w-3.5 h-3.5 text-primary shrink-0"
@@ -447,7 +449,7 @@ export const CartView: React.FC<CartViewProps> = ({
                   {line.warnings.map((warning, idx) => (
                     <div
                       key={idx}
-                      className="flex items-center gap-1.5 p-2 rounded-lg bg-error-bg/30 border border-error/30 text-xs font-medium text-error"
+                      className="flex items-center gap-1.5 p-2 rounded-lg bg-error-bg/30 border border-error/30 text-small font-medium text-error"
                     >
                       <svg
                         className="w-3.5 h-3.5 text-error shrink-0"
@@ -475,17 +477,17 @@ export const CartView: React.FC<CartViewProps> = ({
       {/* Bill Summary Card: Subtotal, GST, Total (incl. GST) */}
       <div className="p-4 bg-white border border-border rounded-xl space-y-3 mb-4">
         {/* Subtotal */}
-        <div className="flex justify-between items-center text-sm text-ink-muted">
+        <div className="flex justify-between items-center text-small text-ink-muted">
           <span>{lang === 'hi' ? 'उप-कुल (सबटोटल)' : 'Subtotal'}</span>
-          <span className="font-semibold text-ink">
+          <span className="text-price font-bold tabular-nums text-ink">
             {formatINR(quote?.subtotal)}
           </span>
         </div>
 
         {/* GST */}
-        <div className="flex justify-between items-center text-sm text-ink-muted">
+        <div className="flex justify-between items-center text-small text-ink-muted">
           <span>{lang === 'hi' ? 'जीएसटी' : 'GST'}</span>
-          <span className="font-semibold text-ink">
+          <span className="text-price font-bold tabular-nums text-ink">
             {formatINR(quote?.gst_amount)}
           </span>
         </div>
@@ -495,10 +497,10 @@ export const CartView: React.FC<CartViewProps> = ({
 
         {/* Total (incl. GST) */}
         <div className="flex justify-between items-baseline pt-1">
-          <span className="text-base font-bold text-ink">
+          <span className="text-body font-bold text-ink">
             {t.total_incl_gst}
           </span>
-          <span className="text-xl font-bold text-primary">
+          <span className="text-price font-bold tabular-nums text-primary">
             {formatINR(quote?.payable)}
           </span>
         </div>
@@ -507,14 +509,14 @@ export const CartView: React.FC<CartViewProps> = ({
       {/* Fixed Bottom Bar: safe-area aware, green, like catalogue cart bar */}
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[420px] bg-primary text-white p-3 z-40 border-t border-primary-dark flex items-center justify-between select-none pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]">
         <div className="flex flex-col">
-          <span className="text-xs uppercase tracking-wider text-green-100 font-medium">
+          <span className="text-small uppercase tracking-wider text-green-100 font-medium tabular-nums">
             {formatCases(totalCases, lang)}
           </span>
           <div className="flex items-baseline gap-1.5">
-            <span className="text-base font-bold">
+            <span className="text-price font-bold tabular-nums">
               {formatINR(quote?.payable)}
             </span>
-            <span className="text-[11px] font-normal text-green-100">
+            <span className="text-small font-normal text-green-100">
               {lang === 'hi' ? 'जीएसटी सहित' : 'incl. GST'}
             </span>
           </div>
@@ -525,7 +527,7 @@ export const CartView: React.FC<CartViewProps> = ({
           type="button"
           disabled={orderPlacing || totalCases === 0 || quoteLoading}
           onClick={handlePlaceOrder}
-          className="min-tap px-4 py-2 rounded-xl bg-white text-primary font-bold text-sm flex items-center space-x-1.5 focus:outline-none hover:bg-gray-100 active:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed select-none shrink-0"
+          className="min-tap px-4 py-2 rounded-xl bg-white text-primary font-bold text-body flex items-center space-x-1.5 focus:outline-none hover:bg-gray-100 active:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed select-none shrink-0"
         >
           {orderPlacing ? (
             <>
@@ -555,19 +557,19 @@ export const CartView: React.FC<CartViewProps> = ({
             </div>
 
             <div className="text-center">
-              <h2 className="text-lg font-bold text-ink">
+              <h2 className="text-title font-bold text-ink">
                 {orderSuccess.status === 'credit_hold'
                   ? t.order_credit_hold_title
                   : t.order_success_title}
               </h2>
               {orderSuccess.status === 'credit_hold' ? (
-                <p className="text-xs text-amber-700 mt-1">
+                <p className="text-small text-amber-700 mt-1">
                   {lang === 'hi'
                     ? 'आपका क्रेडिट लिमिट पार हो गया है। वितरक से संपर्क करें।'
                     : 'Credit limit reached. Distributor approval required.'}
                 </p>
               ) : (
-                <p className="text-xs text-ink-muted mt-1">
+                <p className="text-small text-ink-muted mt-1">
                   {lang === 'hi'
                     ? 'आपका ऑर्डर दर्ज कर लिया गया है।'
                     : 'Your order has been recorded successfully.'}
@@ -575,7 +577,7 @@ export const CartView: React.FC<CartViewProps> = ({
               )}
             </div>
 
-            <div className="bg-surface border border-border rounded-xl p-3 space-y-1.5 text-xs">
+            <div className="bg-surface border border-border rounded-xl p-3 space-y-1.5 text-small tabular-nums">
               <div className="flex justify-between">
                 <span className="text-ink-muted">{t.order_id_label}</span>
                 <span className="font-bold text-ink">#{orderSuccess.id}</span>
@@ -588,7 +590,7 @@ export const CartView: React.FC<CartViewProps> = ({
               </div>
               <div className="flex justify-between">
                 <span className="text-ink-muted">{t.order_total_label}</span>
-                <span className="font-bold text-ink">
+                <span className="font-bold text-ink text-price tabular-nums">
                   {formatINR(orderSuccess.total)}
                 </span>
               </div>
@@ -600,7 +602,7 @@ export const CartView: React.FC<CartViewProps> = ({
                 setOrderSuccess(null);
                 onBackToCatalogue();
               }}
-              className="min-tap w-full h-12 rounded-xl bg-primary text-white font-bold text-sm hover:bg-primary-dark transition-colors"
+              className="min-tap w-full h-12 rounded-xl bg-primary text-white font-bold text-body hover:bg-primary-dark transition-colors"
             >
               {t.return_to_catalogue}
             </button>

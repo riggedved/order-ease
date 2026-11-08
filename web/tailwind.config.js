@@ -33,6 +33,13 @@ export default {
           bg: '#FEE2E2',
         },
       },
+      fontSize: {
+        title: ['var(--font-size-title)', { lineHeight: 'var(--line-height-title)', fontWeight: '700' }],
+        price: ['var(--font-size-price)', { lineHeight: 'var(--line-height-price)', fontWeight: '700' }],
+        body: ['var(--font-size-body)', { lineHeight: 'var(--line-height-body)', fontWeight: '400' }],
+        small: ['var(--font-size-small)', { lineHeight: 'var(--line-height-small)', fontWeight: '400' }],
+        micro: ['var(--font-size-micro)', { lineHeight: 'var(--line-height-micro)', fontWeight: '500' }],
+      },
       fontFamily: {
         sans: [
           'system-ui',

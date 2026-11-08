@@ -3,12 +3,50 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    font-size: 100%;
+  }
+
   :root {
     --primary: #0C831F;
     --primary-dark: #096317;
     --border: #E5E7EB;
     --ink: #111827;
     --muted: #6B7280;
+
+    /* Type scale tokens (16px = 1rem) */
+    --font-size-title: 1.5rem;    /* 24px */
+    --line-height-title: 1.3;
+
+    --font-size-price: 1.125rem;  /* 18px */
+    --line-height-price: 1.3;
+
+    --font-size-body: 1rem;       /* 16px */
+    --line-height-body: 1.5;
+
+    --font-size-small: 0.875rem;  /* 14px */
+    --line-height-small: 1.4;
+
+    --font-size-micro: 0.8125rem; /* 13px (increased from 12px) */
+    --line-height-micro: 1.35;
+  }
+
+  /* For Hindi (:lang(hi)): decreased across the scale for compact, proportional rendering */
+  :lang(hi), [lang="hi"] {
+    --font-size-title: 1.375rem;  /* 22px (was 24px) */
+    --line-height-title: 1.3;
+
+    --font-size-price: 1.0625rem; /* 17px (was 18px) */
+    --line-height-price: 1.3;
+
+    --font-size-body: 0.9375rem;  /* 15px (was 17px) */
+    --line-height-body: 1.5;
+
+    --font-size-small: 0.8125rem; /* 13px (was 15px) */
+    --line-height-small: 1.5;
+
+    --font-size-micro: 0.75rem;   /* 12px (was 14px) */
+    --line-height-micro: 1.35;
   }
 
   html, body {
@@ -19,7 +57,19 @@
     font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background-color: #FFFFFF;
     color: #111827;
+    font-size: var(--font-size-body);
+    line-height: var(--line-height-body);
     -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Inputs, textareas and selects must be at least 16px so iOS does not zoom */
+  input, textarea, select {
+    font-size: max(16px, var(--font-size-body));
+  }
+
+  /* Add font-variant-numeric: tabular-nums to prices and summary */
+  .text-price, [data-price], .tabular-nums {
+    font-variant-numeric: tabular-nums;
   }
 
   /* Zero elevation policy: no shadows or gradients */
@@ -45,4 +95,28 @@
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+@layer utilities {
+  .text-title {
+    font-size: var(--font-size-title);
+    line-height: var(--line-height-title);
+  }
+  .text-price {
+    font-size: var(--font-size-price);
+    line-height: var(--line-height-price);
+    font-variant-numeric: tabular-nums;
+  }
+  .text-body {
+    font-size: var(--font-size-body);
+    line-height: var(--line-height-body);
+  }
+  .text-small {
+    font-size: var(--font-size-small);
+    line-height: var(--line-height-small);
+  }
+  .text-micro {
+    font-size: var(--font-size-micro);
+    line-height: var(--line-height-micro);
+  }
 }
