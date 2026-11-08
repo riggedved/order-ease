@@ -45,6 +45,10 @@ from backend.app.schemas import (
     OrderLineResponse,
     OrderLinePatchItem,
     DeskOrderSummary,
+    DeskOrdersCounts,
+    DeskOrdersResponse,
+    DeskOrderLineResponse,
+    DeskCatalogueSKUResponse,
     DeskOrderDetail,
     CreditPositionResponse,
     OrderPatchRequest,
@@ -743,11 +747,15 @@ def get_my_orders(
 @app.get("/retailers", response_model=List[RetailerSimpleResponse])
 @app.get("/desk/retailers", response_model=List[RetailerSimpleResponse])
 def get_all_retailers(
+    q: Optional[str] = Query(None, description="Retailer name contains"),
     current_user: User = Depends(require_role([Role.ORDER_DESK, Role.OWNER])),
     session: Session = Depends(get_session),
 ):
     """Returns id and name for every retailer so the desk can pick a retailer."""
-    retailers = session.exec(select(Retailer).order_by(Retailer.name)).all()
+    query = select(Retailer).order_by(Retailer.name)
+    if q and q.strip():
+        query = query.where(Retailer.name.ilike(f"%{q.strip()}%"))
+    retailers = session.exec(query).all()
     return [
         RetailerSimpleResponse(id=r.id, name=r.name, phone=r.phone)
         for r in retailers
@@ -775,22 +783,86 @@ def get_retailer(
 # ---------------------------------------------------------
 # Desk Endpoints (Protected: only order_desk and owner)
 # ---------------------------------------------------------
-@app.get("/desk/orders", response_model=List[DeskOrderSummary])
+@app.get("/desk/catalogue", response_model=List[DeskCatalogueSKUResponse])
+def get_desk_catalogue(
+    current_user: User = Depends(require_role([Role.ORDER_DESK, Role.OWNER])),
+    session: Session = Depends(get_session),
+):
+    """Returns catalogue with exact stock quantities for desk and owner only."""
+    skus = session.exec(select(SKU).order_by(SKU.code)).all()
+    return [
+        DeskCatalogueSKUResponse(
+            sku_code=s.code,
+            name=s.name,
+            case_price=s.case_price,
+            units_per_case=s.units_per_case,
+            price_includes_gst=s.price_includes_gst,
+            stock_cases=s.stock_cases,
+        )
+        for s in skus
+    ]
+
+
+@app.get("/desk/orders", response_model=DeskOrdersResponse)
 def get_desk_orders(
     status_filter: Optional[OrderStatus] = Query(None, alias="status"),
+    q: Optional[str] = Query(None, description="Retailer name contains"),
+    from_date: Optional[date] = Query(None, description="Start date filter (inclusive)"),
+    to_date: Optional[date] = Query(None, description="End date filter (inclusive)"),
+    sort: str = Query("newest", description="sort order: newest | oldest"),
+    limit: int = Query(50, ge=1, le=200, description="Items limit (default 50, max 200)"),
+    offset: int = Query(0, ge=0, description="Items offset (default 0)"),
     current_user: User = Depends(require_role([Role.ORDER_DESK, Role.OWNER])),
     session: Session = Depends(get_session),
 ):
     """Returns distributor orders across all stores with status and relative age."""
-    query = select(Order).order_by(Order.created_at.desc())
-    if status_filter:
-        query = query.where(Order.status == status_filter)
-    orders = session.exec(query).all()
+    base_query = select(Order).join(Retailer, Order.retailer_id == Retailer.id)
+    if q and q.strip():
+        base_query = base_query.where(Retailer.name.ilike(f"%{q.strip()}%"))
+    if from_date:
+        start_dt = datetime.combine(from_date, time.min).replace(tzinfo=timezone.utc)
+        base_query = base_query.where(Order.created_at >= start_dt)
+    if to_date:
+        end_dt = datetime.combine(to_date, time.max).replace(tzinfo=timezone.utc)
+        base_query = base_query.where(Order.created_at <= end_dt)
 
-    results: List[DeskOrderSummary] = []
-    for o in orders:
+    base_orders = session.exec(base_query).all()
+    count_all = len(base_orders)
+    count_pending = sum(1 for o in base_orders if o.status == OrderStatus.PENDING)
+    count_credit_hold = sum(1 for o in base_orders if o.status == OrderStatus.CREDIT_HOLD)
+    count_approved = sum(1 for o in base_orders if o.status == OrderStatus.APPROVED)
+    counts = DeskOrdersCounts(
+        all=count_all,
+        pending=count_pending,
+        credit_hold=count_credit_hold,
+        approved=count_approved,
+    )
+
+    filtered_query = base_query
+    if status_filter:
+        filtered_query = filtered_query.where(Order.status == status_filter)
+
+    if sort == "oldest":
+        filtered_query = filtered_query.order_by(Order.created_at.asc(), Order.id.asc())
+    else:
+        filtered_query = filtered_query.order_by(Order.created_at.desc(), Order.id.desc())
+
+    if status_filter:
+        total = (
+            count_pending if status_filter == OrderStatus.PENDING
+            else count_credit_hold if status_filter == OrderStatus.CREDIT_HOLD
+            else count_approved if status_filter == OrderStatus.APPROVED
+            else sum(1 for o in base_orders if o.status == status_filter)
+        )
+    else:
+        total = count_all
+
+    paged_orders = session.exec(filtered_query.offset(offset).limit(limit)).all()
+
+    items: List[DeskOrderSummary] = []
+    for o in paged_orders:
         ret = session.get(Retailer, o.retailer_id)
-        results.append(
+        items.append(
             DeskOrderSummary(
                 id=o.id,
                 retailer_id=o.retailer_id,
@@ -802,7 +874,7 @@ def get_desk_orders(
                 age=format_age(o.created_at),
             )
         )
-    return results
+    return DeskOrdersResponse(items=items, total=total, counts=counts)
 
 
 @app.post("/orders/{order_id}/cancel", response_model=OrderResponse)
@@ -917,6 +989,33 @@ def get_desk_order_detail(
         available_credit=available,
     )
 
+    desk_lines: List[DeskOrderLineResponse] = []
+    for ol in lines:
+        sku = session.exec(select(SKU).where(SKU.code == ol.sku_code)).first()
+        sku_name = sku.name if sku else ol.sku_code
+        desk_lines.append(
+            DeskOrderLineResponse(
+                line_id=ol.id,
+                id=ol.id,
+                sku_code=ol.sku_code,
+                sku_name=sku_name,
+                qty_cases=ol.qty_cases,
+                charged_cases=ol.charged_cases,
+                free_cases=ol.free_cases,
+                price_per_case=ol.price_per_case,
+                discount_amount=ol.discount_amount,
+                line_total=ol.line_total,
+                original_words=ol.original_words,
+                unit=ol.unit,
+            )
+        )
+
+    placed_user = session.get(User, order.placed_by_user_id) if order.placed_by_user_id else None
+    placed_by_name = placed_user.name if placed_user else "Unknown"
+
+    approver = session.get(User, order.approved_by_user_id) if order.approved_by_user_id else None
+    approved_by_name = approver.name if approver else None
+
     return DeskOrderDetail(
         id=order.id,
         retailer_id=order.retailer_id,
@@ -925,23 +1024,17 @@ def get_desk_order_detail(
         source=order.source,
         created_at=order.created_at,
         total=order.total,
-        client_request_id=order.client_request_id,
+        placed_by=placed_by_name,
+        placed_by_user_id=order.placed_by_user_id,
+        credit_position=credit_pos,
         override_flag=order.override_flag,
         override_reason=order.override_reason,
-        lines=[
-            OrderLineResponse(
-                id=ol.id,
-                sku_code=ol.sku_code,
-                qty_cases=ol.qty_cases,
-                charged_cases=ol.charged_cases,
-                free_cases=ol.free_cases,
-                price_per_case=ol.price_per_case,
-                discount_amount=ol.discount_amount,
-                line_total=ol.line_total,
-            )
-            for ol in lines
-        ],
-        credit_position=credit_pos,
+        approved_by=approved_by_name,
+        approved_at=order.approved_at,
+        version=order.version,
+        client_request_id=order.client_request_id,
+        exported_at=order.exported_at,
+        lines=desk_lines,
     )
 
 
@@ -954,14 +1047,30 @@ def patch_desk_order(
 ):
     """Edits line quantities (re-quotes), approves order, or releases credit holds.
 
-    Approving a credit_hold order requires explicit override_flag=True and override_reason.
-    Stock is decremented upon approval.
+    Requires current version. Stale version returns 409.
+    Approving already approved order returns 409.
+    Stock is decremented upon approval. Approver is recorded.
+    Version is incremented on every change.
     """
     order = session.get(Order, order_id)
     if not order:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Order #{order_id} not found",
+        )
+
+    # Require current version. If stale or missing, return 409
+    if payload.version is None or payload.version != order.version:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This order was changed by someone else. Reload it.",
+        )
+
+    # Approving an already approved order returns 409
+    if payload.status == OrderStatus.APPROVED and order.status == OrderStatus.APPROVED:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This order is already approved",
         )
 
     retailer = session.get(Retailer, order.retailer_id)
@@ -1079,7 +1188,13 @@ def patch_desk_order(
                     if sku.stock_cases < needed:
                         raise HTTPException(
                             status_code=status.HTTP_400_BAD_REQUEST,
-                            detail=f"Cannot approve order: insufficient stock for {sku.code} (needs {needed}, available {sku.stock_cases})",
+                            detail={
+                                "error": "insufficient_stock",
+                                "sku_code": sku.code,
+                                "available": sku.stock_cases,
+                                "needed": needed,
+                                "message": f"Insufficient stock for {sku.code} (needs {needed}, available {sku.stock_cases})",
+                            },
                         )
 
             # Deduct stock after verification
@@ -1096,6 +1211,10 @@ def patch_desk_order(
                 retailer.outstanding += order.total
                 session.add(retailer)
 
+            # Record approved_by and approved_at
+            order.approved_by_user_id = current_user.id
+            order.approved_at = datetime.now(timezone.utc)
+
         order.status = target_status
 
     if payload.override_flag:
@@ -1103,6 +1222,8 @@ def patch_desk_order(
     if payload.override_reason:
         order.override_reason = payload.override_reason.strip()
 
+    # Increment version on every change
+    order.version += 1
     session.add(order)
     session.commit()
     session.refresh(order)

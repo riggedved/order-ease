@@ -18,6 +18,9 @@ import { fetchMe, fetchCatalogue, fetchCartQuote } from './api';
 // Lazy-load ProfilePanel overlay
 const ProfilePanel = lazy(() => import('./components/ProfilePanel'));
 
+// Lazy-load DeskShell for order_desk and owner roles (isolated bundle chunk)
+const DeskShell = lazy(() => import('./desk/DeskShell'));
+
 export function App() {
   // 1. Language State
   const [lang, setLang] = useState<Language>(() => {
@@ -339,6 +342,32 @@ export function App() {
     );
     setCurrentView('cart');
   };
+
+  // Role decides the shell after login: retailer gets the phone layout, order_desk and owner get the desk shell
+  if (token && user && (user.role === 'order_desk' || user.role === 'owner')) {
+    return (
+      <Suspense
+        fallback={
+          <div className="min-w-[1280px] w-full min-h-screen bg-white flex items-center justify-center text-ink-muted text-[14px]">
+            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mr-3"></div>
+            <span>Loading order desk...</span>
+          </div>
+        }
+      >
+        <DeskShell
+          user={{
+            id: user.id,
+            name: user.name,
+            role: user.role,
+          }}
+          token={token}
+          lang={lang}
+          onToggleLang={toggleLanguage}
+          onLogout={handleLogout}
+        />
+      </Suspense>
+    );
+  }
 
   return (
     <div className="w-full min-h-screen bg-white flex justify-center">

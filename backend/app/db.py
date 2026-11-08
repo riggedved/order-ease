@@ -1,7 +1,7 @@
 """Database connection, session management, and seed data initialization."""
 
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 import json
 from typing import Generator
@@ -234,8 +234,11 @@ def seed_data_if_empty(session: Session) -> None:
         status=OrderStatus.APPROVED,
         source=OrderSource.RETAILER_APP,
         placed_by_user_id=ret_user_1.id,
-        created_at=datetime.now(timezone.utc),
+        approved_by_user_id=desk_user.id,
+        approved_at=datetime.now(timezone.utc),
+        created_at=datetime.now(timezone.utc) - timedelta(minutes=20),
         total=Decimal("7776.00"),
+        version=1,
     )
     session.add(order_1)
     session.commit()
@@ -257,8 +260,9 @@ def seed_data_if_empty(session: Session) -> None:
         status=OrderStatus.CREDIT_HOLD,
         source=OrderSource.SALESMAN,
         placed_by_user_id=salesman_user.id,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(timezone.utc) - timedelta(minutes=15),
         total=Decimal("9845.50"),
+        version=1,
     )
     session.add(order_2)
     session.commit()
@@ -274,6 +278,54 @@ def seed_data_if_empty(session: Session) -> None:
         line_total=Decimal("9845.50"),
     )
     session.add(line_2)
+
+    order_3 = Order(
+        retailer_id=retailer_3.id,
+        status=OrderStatus.PENDING,
+        source=OrderSource.RETAILER_APP,
+        placed_by_user_id=ret_user_3.id,
+        created_at=datetime.now(timezone.utc) - timedelta(minutes=10),
+        total=Decimal("4060.00"),
+        version=1,
+    )
+    session.add(order_3)
+    session.commit()
+
+    line_3 = OrderLine(
+        order_id=order_3.id,
+        sku_code="SKU-DT-1KG",
+        qty_cases=2,
+        charged_cases=2,
+        free_cases=0,
+        price_per_case=Decimal("2030.00"),
+        discount_amount=Decimal("0.00"),
+        line_total=Decimal("4060.00"),
+    )
+    session.add(line_3)
+
+    order_4 = Order(
+        retailer_id=retailer_4.id,
+        status=OrderStatus.PENDING,
+        source=OrderSource.RETAILER_APP,
+        placed_by_user_id=ret_user_4.id,
+        created_at=datetime.now(timezone.utc) - timedelta(minutes=5),
+        total=Decimal("1555.20"),
+        version=1,
+    )
+    session.add(order_4)
+    session.commit()
+
+    line_4 = OrderLine(
+        order_id=order_4.id,
+        sku_code="SKU-BS-075",
+        qty_cases=2,
+        charged_cases=2,
+        free_cases=0,
+        price_per_case=Decimal("777.60"),
+        discount_amount=Decimal("0.00"),
+        line_total=Decimal("1555.20"),
+    )
+    session.add(line_4)
 
     # 6. Generic Aliases
     alias_1 = Alias(

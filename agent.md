@@ -36,7 +36,7 @@ Build screens for retailer and order_desk only. Salesman and owner are data-mode
 ## Data model
 - `SKU`: code, name, price_per_piece (Decimal), units_per_case, gst_rate, price_includes_gst, stock_cases, scheme_type, scheme_params, image_url.
 - `Retailer`: credit_limit, outstanding, nullable salesman_id.
-- `Order`: status (pending | credit_hold | approved), source (retailer_app | retailer_capture | desk_capture | salesman), placed_by_user_id, client_request_id.
+- `Order`: status (pending | credit_hold | approved), source (retailer_app | retailer_capture | desk_capture | salesman), placed_by_user_id, client_request_id, version (int, default 1), nullable approved_by_user_id, nullable approved_at.
 - `OrderLine`: charged_cases, free_cases, price_per_case, discount_amount, line_total, nullable original_words.
 - `Alias`: retailer_id, original_words, sku_code (per retailer, learned from desk corrections).
 - Seed SKUs, codes exact: `SKU-BS-075` (biscuit 75 g, 96/case, 8.10/pc, 340 cases), `SKU-DT-1KG` (detergent 1 kg, 20/case, 101.50/pc, 85 cases), `SKU-TE-250` (tea 250 g, 40/case, 118.00/pc, 0 stock). Decoys: `SKU-BS-150`, `SKU-DT-500`, `SKU-TE-100`.
@@ -75,11 +75,16 @@ Build screens for retailer and order_desk only. Salesman and owner are data-mode
 - Retailer capture is forced to their own retailer_id. Desk and owner may pass any.
 
 ## API
-Built: `POST /auth/otp`, `GET /me`, `GET /catalogue`, `POST /cart/quote`, `POST /orders`, `POST /orders/{order_id}/cancel`, `GET /orders/mine`, `GET /retailers` (desk/owner), `GET /desk/orders`, `GET /desk/orders/{id}`, `PATCH /desk/orders/{id}`, `POST /capture` (rule & LLM parsers), `GET /desk/export/tally` (XML/CSV).
+Built: `POST /auth/otp`, `GET /me`, `GET /catalogue`, `POST /cart/quote`, `POST /orders`, `POST /orders/{order_id}/cancel`, `GET /orders/mine`, `GET /retailers` (desk/owner), `GET /desk/catalogue` (desk/owner), `GET /desk/orders`, `GET /desk/orders/{id}`, `PATCH /desk/orders/{id}`, `POST /capture` (rule & LLM parsers), `GET /desk/export/tally` (XML/CSV).
 Planned: none (core slice complete).
 Later: `GET /retailers/{id}`, `GET /retailers/{id}/orders`.
 Auth: mock OTP `123456`, JWT with user_id, role, retailer_id. Wrong OTP gives 401.
-Profile: `GET /me` returns user profile. For retailer users, returns `phone`, `salesman_name`, `salesman_phone` (null if unassigned), `credit_low` (true when `available_credit` is below 10% of `credit_limit`), `credit_limit`, `outstanding`, and `available_credit`. For staff users, these are null.
+Profile: `GET /me` returns user profile. For staff users (desk, owner, salesman), returns `name` and `role` (retailer fields are null). For retailer users, returns `phone`, `salesman_name`, `salesman_phone` (null if unassigned), `credit_low` (true when `available_credit` is below 10% of `credit_limit`), `credit_limit`, `outstanding`, and `available_credit`.
+Retailers Directory: `GET /retailers` accepts query param `q` (retailer name contains) for the capture dropdown; restricted to desk and owner.
+Desk Catalogue: `GET /desk/catalogue` returns SKUs with `sku_code`, `name`, `case_price`, `units_per_case`, `price_includes_gst`, and exact `stock_cases` (desk and owner only; retailer gets 403).
+Desk Orders List: `GET /desk/orders` accepts query params `q` (retailer name contains), `from_date`, `to_date`, `sort` (`newest` | `oldest`, default `newest`), `limit` (default 50, max 200), and `offset`. Returns `items` (list of `DeskOrderSummary`), `total`, and `counts` `{all, pending, credit_hold, approved}` that respect `q` and the dates but ignore the `status` filter.
+Desk Order Detail: `GET /desk/orders/{id}` returns lines with `line_id`, `sku_code`, `sku_name`, `qty_cases`, `free_cases`, `line_total`, `original_words`; plus `source`, `created_at`, `placed_by` (user name), `credit_position`, `override_flag`, `override_reason`, `approved_by` (user name), `approved_at`, and `version`.
+Desk Order Patch: `PATCH /desk/orders/{id}` requires current `version`. If stale or missing, returns 409 with `"This order was changed by someone else. Reload it."`. Increments version on every change. A line edit may change `qty_cases` and `sku_code` (alias learning stays). Approving an already approved order returns 409. Returns structured errors on refusal (e.g. `insufficient_stock` with `sku_code` and `available`). Records `approved_by` and `approved_at` on approval.
 Orders: `GET /orders/mine` returns a retailer's own orders, newest first; accepts optional `limit` query parameter (e.g. `limit=3`). A retailer never sees another retailer's data (403).
 Catalogue never returns exact stock numbers to retailers, only in_stock, low (10 or fewer) or out.
 

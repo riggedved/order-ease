@@ -149,6 +149,43 @@ class DeskOrderSummary(BaseModel):
     age: str
 
 
+class DeskOrdersCounts(BaseModel):
+    all: int
+    pending: int
+    credit_hold: int
+    approved: int
+
+
+class DeskOrdersResponse(BaseModel):
+    items: List[DeskOrderSummary]
+    total: int
+    counts: DeskOrdersCounts
+
+
+class DeskOrderLineResponse(BaseModel):
+    line_id: int
+    sku_code: str
+    sku_name: str
+    qty_cases: int
+    free_cases: int = 0
+    line_total: Decimal
+    original_words: Optional[str] = None
+    id: Optional[int] = None
+    charged_cases: Optional[int] = None
+    price_per_case: Optional[Decimal] = None
+    discount_amount: Optional[Decimal] = None
+    unit: Optional[str] = "case"
+
+
+class DeskCatalogueSKUResponse(BaseModel):
+    sku_code: str
+    name: str
+    case_price: Decimal
+    units_per_case: int
+    price_includes_gst: bool
+    stock_cases: int
+
+
 class CreditPositionResponse(BaseModel):
     credit_limit: Decimal
     outstanding: Decimal
@@ -166,12 +203,17 @@ class DeskOrderDetail(BaseModel):
     source: OrderSource
     created_at: datetime
     total: Decimal
-    client_request_id: Optional[str] = None
+    placed_by: str
+    placed_by_user_id: Optional[int] = None
+    credit_position: CreditPositionResponse
     override_flag: bool = False
     override_reason: Optional[str] = None
+    approved_by: Optional[str] = None
+    approved_at: Optional[datetime] = None
+    version: int = 1
+    client_request_id: Optional[str] = None
     exported_at: Optional[datetime] = None
-    lines: List[OrderLineResponse] = Field(default_factory=list)
-    credit_position: CreditPositionResponse
+    lines: List[DeskOrderLineResponse] = Field(default_factory=list)
 
 
 class OrderLinePatchItem(BaseModel):
@@ -181,6 +223,7 @@ class OrderLinePatchItem(BaseModel):
 
 
 class OrderPatchRequest(BaseModel):
+    version: Optional[int] = None
     status: Optional[OrderStatus] = None
     lines: Optional[List[OrderLinePatchItem]] = None
     override_flag: Optional[bool] = False

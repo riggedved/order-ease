@@ -470,7 +470,7 @@ class TestOrdersLifecycle:
 
 
 class TestDeskEndpointsAndPermissions:
-    """Tests for /desk/orders, PATCH /desk/orders/{id}, and GET /retailers."""
+    """Tests for /desk/orders, PATCH /desk/orders/{id}, GET /desk/catalogue, and GET /retailers."""
 
     def test_retailer_calling_patch_returns_403(self, client: TestClient):
         """retailer calling PATCH returns 403."""
@@ -479,7 +479,7 @@ class TestDeskEndpointsAndPermissions:
 
         response = client.patch(
             "/desk/orders/1",
-            json={"status": "approved"},
+            json={"version": 1, "status": "approved"},
             headers=headers,
         )
         assert response.status_code == 403
@@ -491,7 +491,11 @@ class TestDeskEndpointsAndPermissions:
 
         response = client.get("/desk/orders", headers=headers)
         assert response.status_code == 200
-        orders = response.json()
+        data = response.json()
+        assert "items" in data
+        assert "total" in data
+        assert "counts" in data
+        orders = data["items"]
         assert len(orders) >= 1
         first = orders[0]
         assert "retailer" in first
@@ -499,6 +503,255 @@ class TestDeskEndpointsAndPermissions:
         assert "status" in first
         assert "source" in first
         assert "age" in first
+
+    def test_desk_orders_counts_on_seeded_set(self, client: TestClient):
+        """Counts equal 1 credit_hold, 2 pending, 1 approved on seeded set."""
+        desk_token = login_as(client, phone="9826000001")
+        headers = {"Authorization": f"Bearer {desk_token}"}
+
+        res = client.get("/desk/orders", headers=headers)
+        assert res.status_code == 200
+        data = res.json()
+        assert data["total"] == 4
+        assert data["counts"]["all"] == 4
+        assert data["counts"]["credit_hold"] == 1
+        assert data["counts"]["pending"] == 2
+        assert data["counts"]["approved"] == 1
+        assert len(data["items"]) == 4
+
+    def test_desk_orders_q_filter_and_counts(self, client: TestClient):
+        """q filters by retailer name and counts respect q."""
+        desk_token = login_as(client, phone="9826000001")
+        headers = {"Authorization": f"Bearer {desk_token}"}
+
+        # Filter for Sharma -> only 1 order in seed (credit_hold)
+        res = client.get("/desk/orders?q=Sharma", headers=headers)
+        assert res.status_code == 200
+        data = res.json()
+        assert data["total"] == 1
+        assert data["counts"]["all"] == 1
+        assert data["counts"]["credit_hold"] == 1
+        assert data["counts"]["pending"] == 0
+        assert data["counts"]["approved"] == 0
+        assert data["items"][0]["retailer"] == "Sharma Provision Store"
+
+    def test_desk_orders_pagination_limit_and_offset(self, client: TestClient):
+        """Limit and offset page correctly."""
+        desk_token = login_as(client, phone="9826000001")
+        headers = {"Authorization": f"Bearer {desk_token}"}
+
+        # Page 1: limit 2, offset 0
+        res1 = client.get("/desk/orders?limit=2&offset=0&sort=newest", headers=headers)
+        assert res1.status_code == 200
+        data1 = res1.json()
+        assert len(data1["items"]) == 2
+        assert data1["total"] == 4
+        page1_ids = [item["id"] for item in data1["items"]]
+
+        # Page 2: limit 2, offset 2
+        res2 = client.get("/desk/orders?limit=2&offset=2&sort=newest", headers=headers)
+        assert res2.status_code == 200
+        data2 = res2.json()
+        assert len(data2["items"]) == 2
+        assert data2["total"] == 4
+        page2_ids = [item["id"] for item in data2["items"]]
+
+        # Disjoint pages
+        assert set(page1_ids).isdisjoint(set(page2_ids))
+
+    def test_desk_order_detail_full_schema(self, client: TestClient):
+        """GET /desk/orders/{id} returns all required order and line fields."""
+        desk_token = login_as(client, phone="9826000001")
+        headers = {"Authorization": f"Bearer {desk_token}"}
+
+        # Order 1 in seed (approved)
+        res = client.get("/desk/orders/1", headers=headers)
+        assert res.status_code == 200
+        order = res.json()
+        assert order["id"] == 1
+        assert order["source"] == "retailer_app"
+        assert "created_at" in order
+        assert order["placed_by"] == "Ramesh Gupta"
+        assert order["override_flag"] is False
+        assert order["override_reason"] is None
+        assert order["approved_by"] == "Desk Officer Priya"
+        assert order["approved_at"] is not None
+        assert order["version"] == 1
+        assert "credit_position" in order
+
+        # Check lines
+        assert len(order["lines"]) == 1
+        line = order["lines"][0]
+        assert line["line_id"] == 1
+        assert line["sku_code"] == "SKU-BS-075"
+        assert line["sku_name"] == "Glucose biscuit 75 g, case of 96"
+        assert line["qty_cases"] == 10
+        assert line["free_cases"] == 1
+        assert line["line_total"] == "7776.00"
+        assert "original_words" in line
+
+    def test_desk_catalogue_desk_and_owner_only(self, client: TestClient):
+        """GET /desk/catalogue returns exact stock_cases for desk and owner only."""
+        desk_token = login_as(client, phone="9826000001")
+        headers_desk = {"Authorization": f"Bearer {desk_token}"}
+
+        res = client.get("/desk/catalogue", headers=headers_desk)
+        assert res.status_code == 200
+        skus = res.json()
+        assert len(skus) >= 3
+        bs075 = next(s for s in skus if s["sku_code"] == "SKU-BS-075")
+        assert bs075["name"] == "Glucose biscuit 75 g, case of 96"
+        assert bs075["case_price"] == "777.60"
+        assert bs075["units_per_case"] == 96
+        assert bs075["price_includes_gst"] is False
+        assert bs075["stock_cases"] == 340
+
+        # Owner also allowed
+        owner_token = login_as(client, phone="9826000003")
+        headers_owner = {"Authorization": f"Bearer {owner_token}"}
+        owner_res = client.get("/desk/catalogue", headers=headers_owner)
+        assert owner_res.status_code == 200
+
+        # Retailer gets 403
+        ret_token = login_as(client, phone="9826011111")
+        headers_ret = {"Authorization": f"Bearer {ret_token}"}
+        ret_res = client.get("/desk/catalogue", headers=headers_ret)
+        assert ret_res.status_code == 403
+
+    def test_patch_order_versioning_and_concurrency(self, client: TestClient):
+        """Stale version returns 409, approving twice returns 409, approved_by stored."""
+        desk_token = login_as(client, phone="9826000001")
+        headers = {"Authorization": f"Bearer {desk_token}"}
+
+        # Order 3 is seeded as PENDING with version=1
+        detail = client.get("/desk/orders/3", headers=headers).json()
+        assert detail["version"] == 1
+        assert detail["status"] == "pending"
+
+        # 1. Stale version returns 409
+        stale_res = client.patch(
+            "/desk/orders/3",
+            json={"version": 999, "status": "approved"},
+            headers=headers,
+        )
+        assert stale_res.status_code == 409
+        assert stale_res.json()["detail"] == "This order was changed by someone else. Reload it."
+
+        # Missing version also returns 409
+        missing_ver_res = client.patch(
+            "/desk/orders/3",
+            json={"status": "approved"},
+            headers=headers,
+        )
+        assert missing_ver_res.status_code == 409
+        assert missing_ver_res.json()["detail"] == "This order was changed by someone else. Reload it."
+
+        # 2. Approve with correct version=1 -> 200 OK
+        approve_res = client.patch(
+            "/desk/orders/3",
+            json={"version": 1, "status": "approved"},
+            headers=headers,
+        )
+        assert approve_res.status_code == 200
+        approved_data = approve_res.json()
+        assert approved_data["status"] == "approved"
+        assert approved_data["version"] == 2
+        assert approved_data["approved_by"] == "Desk Officer Priya"
+        assert approved_data["approved_at"] is not None
+
+        # 3. Approving twice returns 409
+        double_approve_res = client.patch(
+            "/desk/orders/3",
+            json={"version": 2, "status": "approved"},
+            headers=headers,
+        )
+        assert double_approve_res.status_code == 409
+
+    def test_patch_order_line_edit_qty_and_sku(self, client: TestClient):
+        """A line edit may change qty_cases and sku_code, incrementing version."""
+        desk_token = login_as(client, phone="9826000001")
+        headers = {"Authorization": f"Bearer {desk_token}"}
+
+        # Order 4 is seeded as PENDING with version=1 (SKU-BS-075, 2 cases)
+        patch_res = client.patch(
+            "/desk/orders/4",
+            json={
+                "version": 1,
+                "lines": [{"sku_code": "SKU-DT-1KG", "qty_cases": 3}],
+            },
+            headers=headers,
+        )
+        assert patch_res.status_code == 200
+        data = patch_res.json()
+        assert data["version"] == 2
+        assert len(data["lines"]) == 1
+        assert data["lines"][0]["sku_code"] == "SKU-DT-1KG"
+        assert data["lines"][0]["qty_cases"] == 3
+        assert data["lines"][0]["line_total"] == "6090.00"
+
+    def test_patch_order_insufficient_stock_structured_error(self, client: TestClient, session):
+        """Insufficient stock reports structured error with sku_code and available."""
+        desk_token = login_as(client, phone="9826000001")
+        headers = {"Authorization": f"Bearer {desk_token}"}
+
+        # Order 3 is seeded as PENDING: 2 cases of SKU-DT-1KG (needs 2 cases).
+        # Reduce SKU-DT-1KG stock to 1 case in DB so it cannot be approved
+        sku = session.exec(select(SKU).where(SKU.code == "SKU-DT-1KG")).first()
+        sku.stock_cases = 1
+        session.add(sku)
+        session.commit()
+
+        # Try approving Order 3 (version 1) -> 400 with structured insufficient stock error
+        approve_res = client.patch(
+            "/desk/orders/3",
+            json={"version": 1, "status": "approved"},
+            headers=headers,
+        )
+        assert approve_res.status_code == 400
+        detail = approve_res.json()["detail"]
+        assert detail["error"] == "insufficient_stock"
+        assert detail["sku_code"] == "SKU-DT-1KG"
+        assert detail["available"] == 1
+
+    def test_get_retailers_q_filter(self, client: TestClient):
+        """GET /retailers?q= filters retailers by name."""
+        desk_token = login_as(client, phone="9826000001")
+        headers = {"Authorization": f"Bearer {desk_token}"}
+
+        res = client.get("/retailers?q=Gupta", headers=headers)
+        assert res.status_code == 200
+        retailers = res.json()
+        assert len(retailers) == 1
+        assert retailers[0]["name"] == "Gupta Kirana Store"
+
+    def test_get_me_for_staff(self, client: TestClient):
+        """GET /me for staff returns name and role."""
+        desk_token = login_as(client, phone="9826000001")
+        headers = {"Authorization": f"Bearer {desk_token}"}
+
+        res = client.get("/me", headers=headers)
+        assert res.status_code == 200
+        me = res.json()
+        assert me["name"] == "Desk Officer Priya"
+        assert me["role"] == "order_desk"
+
+        # Owner
+        owner_token = login_as(client, phone="9826000003")
+        owner_res = client.get("/me", headers={"Authorization": f"Bearer {owner_token}"})
+        assert owner_res.status_code == 200
+        assert owner_res.json()["name"] == "Owner Rajesh Agarwal"
+        assert owner_res.json()["role"] == "owner"
+
+    def test_retailer_calling_desk_endpoints_returns_403(self, client: TestClient):
+        """A retailer calling /desk/orders, /desk/orders/{id}, PATCH, /desk/catalogue, /retailers gets 403."""
+        ret_token = login_as(client, phone="9826011111")
+        headers = {"Authorization": f"Bearer {ret_token}"}
+
+        assert client.get("/desk/orders", headers=headers).status_code == 403
+        assert client.get("/desk/orders/1", headers=headers).status_code == 403
+        assert client.patch("/desk/orders/1", json={"version": 1, "status": "approved"}, headers=headers).status_code == 403
+        assert client.get("/desk/catalogue", headers=headers).status_code == 403
+        assert client.get("/retailers", headers=headers).status_code == 403
 
     def test_desk_order_detail_credit_position(self, client: TestClient):
         """Desk gets order detail including credit position."""
@@ -524,7 +777,7 @@ class TestDeskEndpointsAndPermissions:
         # Try approving without override flag or reason -> 400
         bad_patch = client.patch(
             "/desk/orders/2",
-            json={"status": "approved"},
+            json={"version": 1, "status": "approved"},
             headers=headers,
         )
         assert bad_patch.status_code == 400
@@ -534,6 +787,7 @@ class TestDeskEndpointsAndPermissions:
         good_patch = client.patch(
             "/desk/orders/2",
             json={
+                "version": 1,
                 "status": "approved",
                 "override_flag": True,
                 "override_reason": "Merchant promised payment by cheque tomorrow",
@@ -576,7 +830,7 @@ class TestDeskEndpointsAndPermissions:
 
         patch_res = client.patch(
             f"/desk/orders/{order_id}",
-            json={"status": "approved"},
+            json={"version": 1, "status": "approved"},
             headers=headers_desk,
         )
         assert patch_res.status_code == 200

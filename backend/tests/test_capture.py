@@ -429,13 +429,14 @@ class TestCaptureEndpointAndLifecycle:
         patch_res = client.patch(
             f"/desk/orders/{order_id}",
             json={
+                "version": 1,
                 "lines": [
                     {
                         "sku_code": "SKU-BS-150",
                         "qty_cases": 5,
                         "original_words": words,
                     }
-                ]
+                ],
             },
             headers=headers_desk,
         )
@@ -532,9 +533,12 @@ class TestCaptureEndpointAndLifecycle:
         # Desk tries to approve order -> Must be refused with 400 because stock is 340 < 350
         patch_res = client.patch(
             f"/desk/orders/{order.id}",
-            json={"status": "approved"},
+            json={"version": 1, "status": "approved"},
             headers=headers_desk,
         )
         assert patch_res.status_code == 400
-        assert "insufficient stock" in patch_res.json()["detail"].lower()
+        detail = patch_res.json()["detail"]
+        assert detail["error"] == "insufficient_stock"
+        assert detail["sku_code"] == "SKU-BS-075"
+        assert detail["available"] == 340
 

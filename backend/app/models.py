@@ -104,6 +104,9 @@ class Order(SQLModel, table=True):
     override_flag: bool = Field(default=False)
     override_reason: Optional[str] = Field(default=None, nullable=True)
     exported_at: Optional[datetime] = Field(default=None, nullable=True)
+    version: int = Field(default=1)
+    approved_by_user_id: Optional[int] = Field(default=None, foreign_key="users.id", nullable=True)
+    approved_at: Optional[datetime] = Field(default=None, nullable=True)
 
     # Relationships
     retailer: Optional[Retailer] = Relationship(back_populates="orders")
