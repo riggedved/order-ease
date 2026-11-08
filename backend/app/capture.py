@@ -255,12 +255,29 @@ class RuleBasedParser:
                 break
 
         if not matched_sku:
+            clean_alias_map = {self._clean_for_alias_match(k): v for k, v in alias_map.items()}
+            for cand in [norm_words, clean_words, norm_item, clean_item]:
+                if cand in clean_alias_map:
+                    matched_sku = clean_alias_map[cand]
+                    confidence = "high"
+                    break
+
+        if not matched_sku:
             for alias_words, alias_sku in alias_map.items():
+                clean_alias = self._clean_for_alias_match(alias_words)
                 if alias_words and (
                     alias_words in norm_words
                     or alias_words in clean_words
                     or alias_words in norm_item
                     or alias_words in clean_item
+                ):
+                    matched_sku = alias_sku
+                    confidence = "high"
+                    break
+                if clean_alias and (
+                    clean_alias in norm_words
+                    or clean_alias in clean_words
+                    or (clean_words and clean_words in clean_alias)
                 ):
                     matched_sku = alias_sku
                     confidence = "high"
@@ -455,7 +472,6 @@ class LLMParser:
                 {"role": "user", "content": user_content},
             ],
             "temperature": 0,
-            "chat_template_kwargs": {"thinking": False},
         }
 
         url = f"{self.base_url.rstrip('/')}/chat/completions"
