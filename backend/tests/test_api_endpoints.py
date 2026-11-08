@@ -292,6 +292,41 @@ class TestOrdersLifecycle:
         res = client.post("/orders/2/cancel", headers=headers)
         assert res.status_code == 403
 
+    def test_pay_outstanding_partial_and_full(self, client: TestClient):
+        """Retailer can pay outstanding balance partially and fully, restoring available credit."""
+        token = login_as(client, phone="9826011111")  # Retailer 1 (Gupta: limit=100,000, outstanding=25,000)
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # 1. Partial payment of 10,000
+        pay_res1 = client.post("/me/pay", json={"amount": 10000.00}, headers=headers)
+        assert pay_res1.status_code == 200
+        data1 = pay_res1.json()
+        assert data1["success"] is True
+        assert float(data1["amount_paid"]) == pytest.approx(10000.00)
+        assert float(data1["new_outstanding"]) == pytest.approx(15000.00)
+        assert float(data1["new_available_credit"]) == pytest.approx(85000.00)
+
+        # 2. Full payment with no payload (pays remaining 15,000)
+        pay_res2 = client.post("/me/pay", json={}, headers=headers)
+        assert pay_res2.status_code == 200
+        data2 = pay_res2.json()
+        assert data2["success"] is True
+        assert float(data2["amount_paid"]) == pytest.approx(15000.00)
+        assert float(data2["new_outstanding"]) == pytest.approx(0.00)
+        assert float(data2["new_available_credit"]) == pytest.approx(100000.00)
+
+        # 3. Paying when outstanding is 0 fails with 400
+        pay_res3 = client.post("/me/pay", json={}, headers=headers)
+        assert pay_res3.status_code == 400
+        assert "No outstanding" in pay_res3.json()["detail"]
+
+    def test_pay_outstanding_forbidden_for_staff(self, client: TestClient):
+        """Staff (order_desk) cannot call /me/pay."""
+        desk_token = login_as(client, phone="9826000001")
+        headers = {"Authorization": f"Bearer {desk_token}"}
+        res = client.post("/me/pay", json={"amount": 5000.00}, headers=headers)
+        assert res.status_code == 403
+
     def test_duplicate_client_request_id_returns_same_order(self, client: TestClient):
         """duplicate client_request_id returns the same order."""
         token = login_as(client, phone="9826011111")

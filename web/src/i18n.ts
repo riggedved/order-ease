@@ -152,6 +152,10 @@ export const translations = {
     order_cancelled_badge: "Cancelled",
     order_cancelled_msg: "Order #{id} has been cancelled.",
     status_cancelled: "Cancelled",
+    pay_outstanding_btn: "Pay outstanding amount",
+    paying_outstanding: "Processing payment...",
+    no_outstanding_due: "No outstanding balance",
+    payment_success: "Payment of {amount} successful! Credit restored.",
   },
   hi: {
     // Header
@@ -304,6 +308,10 @@ export const translations = {
     order_cancelled_badge: "रद्द किया गया",
     order_cancelled_msg: "ऑर्डर #{id} रद्द कर दिया गया है।",
     status_cancelled: "रद्द किया गया",
+    pay_outstanding_btn: "बकाया राशि का भुगतान करें",
+    paying_outstanding: "भुगतान संसाधित हो रहा है...",
+    no_outstanding_due: "कोई बकाया राशि नहीं है",
+    payment_success: "{amount} का भुगतान सफल रहा! क्रेडिट बहाल कर दिया गया है।",
   },
 } as const;
 

@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import type { Language } from '../i18n';
 import { translations } from '../i18n';
 import type { UserMe, OrderResponse } from '../types';
-import { fetchMyOrders, cancelOrder } from '../api';
+import { fetchMyOrders, cancelOrder, payOutstanding } from '../api';
 import { formatINR, formatDate, getSkuDisplayName } from '../utils';
 import { ProductImage } from './ProductImage';
 
@@ -17,6 +17,7 @@ export interface ProfilePanelProps {
   onToggleLang: () => void;
   onLogout: () => void;
   onOrderCancelled?: () => void;
+  onCreditUpdated?: () => void;
   returnFocusRef?: React.RefObject<HTMLButtonElement | null>;
 }
 
@@ -30,6 +31,7 @@ export const ProfilePanel: React.FC<ProfilePanelProps> = ({
   onToggleLang,
   onLogout,
   onOrderCancelled,
+  onCreditUpdated,
 }) => {
   const t = translations[lang];
   const creditCardRef = useRef<HTMLDivElement>(null);
@@ -46,6 +48,11 @@ export const ProfilePanel: React.FC<ProfilePanelProps> = ({
   // Order cancellation state
   const [cancellingOrderId, setCancellingOrderId] = useState<number | null>(null);
   const [cancelSuccessMessage, setCancelSuccessMessage] = useState<string | null>(null);
+
+  // Payment state
+  const [isPayingOutstanding, setIsPayingOutstanding] = useState(false);
+  const [paymentSuccessMessage, setPaymentSuccessMessage] = useState<string | null>(null);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   const handleBackToCatalogue = useCallback(() => {
     (onBack || onClose)?.();
@@ -103,6 +110,26 @@ export const ProfilePanel: React.FC<ProfilePanelProps> = ({
       alert(err.message || 'Failed to cancel order');
     } finally {
       setCancellingOrderId(null);
+    }
+  };
+
+  // 4. Pay Outstanding handler
+  const handlePayOutstanding = async () => {
+    if (outstandingNum <= 0 || isPayingOutstanding) return;
+    setIsPayingOutstanding(true);
+    setPaymentSuccessMessage(null);
+    setPaymentError(null);
+    try {
+      const res = await payOutstanding(token);
+      setPaymentSuccessMessage(
+        t.payment_success.replace('{amount}', formatINR(res.amount_paid))
+      );
+      onCreditUpdated?.();
+      onOrderCancelled?.();
+    } catch (err: any) {
+      setPaymentError(err.message || 'Payment failed');
+    } finally {
+      setIsPayingOutstanding(false);
     }
   };
 
@@ -406,26 +433,66 @@ export const ProfilePanel: React.FC<ProfilePanelProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* Pay Outstanding Amount Button */}
+            <div className="pt-1">
+              {outstandingNum > 0 ? (
+                <button
+                  type="button"
+                  onClick={handlePayOutstanding}
+                  disabled={isPayingOutstanding}
+                  className="w-full min-tap h-12 rounded-xl bg-primary text-white font-bold text-sm flex items-center justify-center gap-2 hover:bg-primary-dark active:bg-primary-dark transition-colors focus:outline-none disabled:opacity-50 select-none shadow-none cursor-pointer"
+                >
+                  {isPayingOutstanding ? (
+                    <span>{t.paying_outstanding}</span>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4 shrink-0 text-white" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <rect x="2" y="6" width="20" height="12" rx="2" strokeLinecap="round" strokeLinejoin="round" />
+                        <circle cx="12" cy="12" r="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                        <line x1="6" y1="12" x2="6.01" y2="12" strokeLinecap="round" strokeLinejoin="round" />
+                        <line x1="18" y1="12" x2="18.01" y2="12" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      <span>{t.pay_outstanding_btn} ({formatINR(outstandingNum)})</span>
+                    </>
+                  )}
+                </button>
+              ) : (
+                <div className="w-full h-11 rounded-xl bg-gray-50 border border-border flex items-center justify-center text-xs font-semibold text-ink-muted gap-1.5">
+                  <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span>{t.no_outstanding_due}</span>
+                </div>
+              )}
+
+              {paymentSuccessMessage && (
+                <div className="mt-2.5 p-3 bg-green-50 border border-green-200 rounded-xl text-xs font-semibold text-[#0C6B1A] flex items-center gap-2">
+                  <svg className="w-4 h-4 shrink-0 text-primary" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span>{paymentSuccessMessage}</span>
+                </div>
+              )}
+              {paymentError && (
+                <div className="mt-2.5 p-3 bg-red-50 border border-red-200 rounded-xl text-xs font-semibold text-error flex items-center gap-2">
+                  <svg className="w-4 h-4 shrink-0 text-error" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                  <span>{paymentError}</span>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* e) Recent orders from GET /orders/mine?limit=3 with small product images side by side */}
           <div className="p-4 border-b border-border space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-ink-muted">
-                {t.recent_orders}
+                {isViewingAllOrders ? (lang === 'hi' ? 'सभी ऑर्डर' : 'All Orders') : t.recent_orders}
               </span>
-              {!isViewingAllOrders && orders.length >= 3 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsViewingAllOrders(true);
-                    loadOrders(true);
-                  }}
-                  className="text-xs font-semibold text-primary hover:underline focus:outline-none"
-                >
-                  {t.view_all_orders}
-                </button>
-              )}
             </div>
 
             {ordersLoading ? (
@@ -509,6 +576,29 @@ export const ProfilePanel: React.FC<ProfilePanelProps> = ({
                     </div>
                   </button>
                 ))}
+
+                {/* View all orders button below the 3 most recent orders */}
+                {!isViewingAllOrders && orders.length >= 3 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsViewingAllOrders(true);
+                      loadOrders(true);
+                    }}
+                    className="w-full min-tap h-11 rounded-xl border border-border bg-white hover:bg-gray-50 active:bg-gray-100 text-primary text-xs font-bold flex items-center justify-center gap-1.5 transition-colors focus:outline-none cursor-pointer"
+                  >
+                    <span>{t.view_all_orders}</span>
+                    <svg
+                      className="w-4 h-4 text-primary"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                )}
               </div>
             )}
           </div>

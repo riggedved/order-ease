@@ -209,3 +209,15 @@ class UserMeResponse(BaseModel):
     available_credit: Optional[Decimal] = None
 
 
+class PaymentRequest(BaseModel):
+    amount: Optional[Decimal] = None
+
+
+class PaymentResponse(BaseModel):
+    success: bool
+    amount_paid: Decimal
+    new_outstanding: Decimal
+    new_available_credit: Decimal
+    message: str
+
+

@@ -106,6 +106,21 @@ export async function cancelOrder(orderId: number, token: string): Promise<Order
   }, token);
 }
 
+export interface PaymentResponse {
+  success: boolean;
+  amount_paid: string | number;
+  new_outstanding: string | number;
+  new_available_credit: string | number;
+  message: string;
+}
+
+export async function payOutstanding(token: string, amount?: number): Promise<PaymentResponse> {
+  return request<PaymentResponse>('/me/pay', {
+    method: 'POST',
+    body: JSON.stringify(amount ? { amount } : {}),
+  }, token);
+}
+
 export async function fetchCatalogue(retailerId: number, token: string): Promise<CatalogueSKU[]> {
   return request<CatalogueSKU[]>(`/catalogue?retailer_id=${retailerId}`, {
     method: 'GET',

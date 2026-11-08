@@ -406,6 +406,7 @@ export function App() {
                 onToggleLang={toggleLanguage}
                 onLogout={handleLogout}
                 onOrderCancelled={refreshUser}
+                onCreditUpdated={refreshUser}
               />
             </Suspense>
           )}

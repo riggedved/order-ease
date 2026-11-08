@@ -53,6 +53,8 @@ from backend.app.schemas import (
     CaptureResponse,
     ParsedLineResponse,
     UserMeResponse,
+    PaymentRequest,
+    PaymentResponse,
 )
 
 
@@ -337,6 +339,51 @@ def get_me(
         credit_limit=credit_limit,
         outstanding=outstanding,
         available_credit=available_credit_val,
+    )
+
+
+@app.post("/me/pay", response_model=PaymentResponse)
+def pay_outstanding(
+    payload: Optional[PaymentRequest] = None,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Allows a retailer to pay their outstanding balance, restoring available credit."""
+    if current_user.role != Role.RETAILER or not current_user.retailer_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Only retailers can pay their outstanding balance",
+        )
+
+    retailer = session.get(Retailer, current_user.retailer_id)
+    if not retailer:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Retailer profile not found",
+        )
+
+    # Determine amount to pay: if not specified or <= 0, pay full outstanding
+    pay_amount = payload.amount if payload and payload.amount and payload.amount > 0 else retailer.outstanding
+
+    if pay_amount <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No outstanding balance to pay",
+        )
+
+    actual_paid = min(retailer.outstanding, pay_amount)
+    retailer.outstanding = max(Decimal("0.00"), retailer.outstanding - actual_paid)
+    session.add(retailer)
+    session.commit()
+    session.refresh(retailer)
+
+    available = retailer.credit_limit - retailer.outstanding
+    return PaymentResponse(
+        success=True,
+        amount_paid=actual_paid,
+        new_outstanding=retailer.outstanding,
+        new_available_credit=available,
+        message=f"Payment of ₹{actual_paid} successful. Available credit is now ₹{available}.",
     )
 
 
