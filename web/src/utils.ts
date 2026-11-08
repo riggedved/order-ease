@@ -27,12 +27,78 @@ export function formatINR(val: number | string | null | undefined): string {
 }
 
 /**
+ * Formats a monetary value for header pill display (rounded integer with Indian grouping):
+ * e.g., 75000 -> "₹75,000"
+ * e.g., 3500 -> "₹3,500"
+ */
+export function formatINRPill(val: number | string | null | undefined): string {
+  if (val === null || val === undefined) return '';
+  const num = typeof val === 'string' ? parseFloat(val) : val;
+  if (isNaN(num)) return '';
+
+  const rounded = Math.round(num);
+  let intPart = rounded.toString();
+  const isNegative = intPart.startsWith('-');
+  if (isNegative) intPart = intPart.substring(1);
+
+  let last3 = intPart.slice(-3);
+  const otherDigits = intPart.slice(0, -3);
+  if (otherDigits !== '') {
+    last3 = ',' + last3;
+  }
+  const formattedInt = otherDigits.replace(/\B(?=(\d{2})+(?!\d))/g, ',') + last3;
+  return (isNegative ? '-₹' : '₹') + formattedInt;
+}
+
+/**
+ * Formats ISO date string into readable day, month, year.
+ */
+export function formatDate(dateStr: string | null | undefined, lang: Language = 'en'): string {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const day = d.getDate();
+    const monthsEn = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthsHi = ['जन', 'फर', 'मार्च', 'अप्रै', 'मई', 'जून', 'जुला', 'अग', 'सित', 'अक्तू', 'नव', 'दिस'];
+    const month = lang === 'hi' ? monthsHi[d.getMonth()] : monthsEn[d.getMonth()];
+    const year = d.getFullYear();
+    return `${day} ${month} ${year}`;
+  } catch {
+    return dateStr;
+  }
+}
+
+/**
  * Strips trailing ", case of N" suffix from product name.
  * e.g., "Glucose biscuit 75 g, case of 96" -> "Glucose biscuit 75 g"
  */
 export function cleanProductName(name: string): string {
   if (!name) return '';
   return name.replace(/,?\s*case of \d+/i, '').trim();
+}
+
+/**
+ * Returns clean display name for a given SKU code and optional product name.
+ */
+export function getSkuDisplayName(code: string, name?: string | null): string {
+  if (name && name !== code) return cleanProductName(name);
+  switch (code) {
+    case 'SKU-BS-075':
+      return 'Glucose biscuit 75 g';
+    case 'SKU-BS-150':
+      return 'Glucose biscuit 150 g';
+    case 'SKU-DT-1KG':
+      return 'Detergent powder 1 kg';
+    case 'SKU-DT-500':
+      return 'Detergent powder 500 g';
+    case 'SKU-TE-250':
+      return 'Tea leaf 250 g';
+    case 'SKU-TE-100':
+      return 'Tea leaf 100 g';
+    default:
+      return code;
+  }
 }
 
 /**

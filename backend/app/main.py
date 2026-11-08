@@ -287,12 +287,41 @@ def get_me(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    """Returns user id, name, role, retailer_id and retailer_name for the logged-in user."""
+    """Returns user profile for the logged-in user.
+
+    For retailer users:
+    - phone: user's phone number
+    - salesman_name: name of assigned salesman (or None if unassigned)
+    - salesman_phone: phone of assigned salesman (or None if unassigned)
+    - credit_low: True when available_credit is below 10% of credit_limit
+    For staff users (desk, salesman, owner):
+    - phone, salesman_name, salesman_phone, credit_low are null.
+    """
     retailer_name = None
-    if current_user.retailer_id:
-        retailer = session.get(Retailer, current_user.retailer_id)
-        if retailer:
-            retailer_name = retailer.name
+    phone = None
+    salesman_name = None
+    salesman_phone = None
+    credit_low = None
+    credit_limit = None
+    outstanding = None
+    available_credit_val = None
+
+    if current_user.role == Role.RETAILER:
+        phone = current_user.phone
+        if current_user.retailer_id:
+            retailer = session.get(Retailer, current_user.retailer_id)
+            if retailer:
+                retailer_name = retailer.name
+                credit_limit = retailer.credit_limit
+                outstanding = retailer.outstanding
+                available_credit = retailer.credit_limit - retailer.outstanding
+                available_credit_val = available_credit
+                credit_low = available_credit < (retailer.credit_limit * Decimal("0.10"))
+                if retailer.salesman_id:
+                    salesman = session.get(User, retailer.salesman_id)
+                    if salesman:
+                        salesman_name = salesman.name
+                        salesman_phone = salesman.phone
 
     return UserMeResponse(
         id=current_user.id,
@@ -301,6 +330,13 @@ def get_me(
         role=current_user.role.value,
         retailer_id=current_user.retailer_id,
         retailer_name=retailer_name,
+        phone=phone,
+        salesman_name=salesman_name,
+        salesman_phone=salesman_phone,
+        credit_low=credit_low,
+        credit_limit=credit_limit,
+        outstanding=outstanding,
+        available_credit=available_credit_val,
     )
 
 
@@ -528,8 +564,15 @@ def create_order(
         client_request_id=payload.client_request_id,
     )
     session.add(order)
+
+    # Orders within the credit limit are placed normally and decrease the available credit limit (by increasing outstanding)
+    if order_status != OrderStatus.CREDIT_HOLD:
+        retailer.outstanding += quote.payable
+        session.add(retailer)
+
     session.commit()
     session.refresh(order)
+    session.refresh(retailer)
 
     # 6. Persist Order Lines carrying original_words and unit
     req_meta = {
@@ -589,22 +632,27 @@ def create_order(
 
 @app.get("/orders/mine", response_model=List[OrderResponse])
 def get_my_orders(
+    limit: Optional[int] = Query(default=None, description="Optional maximum number of orders to return", ge=1),
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    """Returns a retailer's own order history."""
+    """Returns a retailer's own order history, newest first."""
     if not current_user.retailer_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Current user is not associated with a retailer",
         )
     retailer = session.get(Retailer, current_user.retailer_id)
-    orders = session.exec(
+    query = (
         select(Order)
         .where(Order.retailer_id == current_user.retailer_id)
-        .order_by(Order.created_at.desc())
-    ).all()
+        .order_by(Order.created_at.desc(), Order.id.desc())
+    )
+    if limit is not None:
+        query = query.limit(limit)
+    orders = session.exec(query).all()
 
+    sku_map = {s.code: s.name for s in session.exec(select(SKU)).all()}
     results: List[OrderResponse] = []
     for o in orders:
         lines = session.exec(select(OrderLine).where(OrderLine.order_id == o.id)).all()
@@ -625,12 +673,15 @@ def get_my_orders(
                     OrderLineResponse(
                         id=ol.id,
                         sku_code=ol.sku_code,
+                        name=sku_map.get(ol.sku_code, ol.sku_code),
                         qty_cases=ol.qty_cases,
                         charged_cases=ol.charged_cases,
                         free_cases=ol.free_cases,
                         price_per_case=ol.price_per_case,
                         discount_amount=ol.discount_amount,
                         line_total=ol.line_total,
+                        original_words=ol.original_words,
+                        unit=ol.unit,
                     )
                     for ol in lines
                 ],
@@ -705,6 +756,87 @@ def get_desk_orders(
             )
         )
     return results
+
+
+@app.post("/orders/{order_id}/cancel", response_model=OrderResponse)
+def cancel_order(
+    order_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Cancels a pending or credit_hold order and restores retailer credit limit if previously pending."""
+    order = session.get(Order, order_id)
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Order #{order_id} not found",
+        )
+
+    # Check retailer authorization: Retailer can only cancel their own orders
+    if current_user.role == Role.RETAILER:
+        if order.retailer_id != current_user.retailer_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Forbidden: Cannot cancel an order belonging to another retailer",
+            )
+    elif current_user.role == Role.SALESMAN:
+        retailer = session.get(Retailer, order.retailer_id)
+        if not retailer or retailer.salesman_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Forbidden: Salesman not assigned to this retailer",
+            )
+
+    # Check allowed statuses
+    if order.status not in [OrderStatus.PENDING, OrderStatus.CREDIT_HOLD]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot cancel order #{order_id} with status '{order.status}'. Only pending or credit_hold orders can be cancelled.",
+        )
+
+    retailer = session.get(Retailer, order.retailer_id)
+
+    # If the order was pending, its total was added to retailer.outstanding; restore it!
+    if order.status == OrderStatus.PENDING and retailer:
+        retailer.outstanding = max(Decimal("0.00"), retailer.outstanding - order.total)
+        session.add(retailer)
+
+    order.status = OrderStatus.CANCELLED
+    session.add(order)
+    session.commit()
+    session.refresh(order)
+
+    lines = session.exec(select(OrderLine).where(OrderLine.order_id == order.id)).all()
+    sku_map = {s.code: s.name for s in session.exec(select(SKU)).all()}
+    return OrderResponse(
+        id=order.id,
+        retailer_id=order.retailer_id,
+        retailer_name=retailer.name if retailer else "",
+        status=order.status,
+        source=order.source,
+        placed_by_user_id=order.placed_by_user_id,
+        created_at=order.created_at,
+        total=order.total,
+        client_request_id=order.client_request_id,
+        override_flag=order.override_flag,
+        override_reason=order.override_reason,
+        lines=[
+            OrderLineResponse(
+                id=ol.id,
+                sku_code=ol.sku_code,
+                name=sku_map.get(ol.sku_code, ol.sku_code),
+                qty_cases=ol.qty_cases,
+                charged_cases=ol.charged_cases,
+                free_cases=ol.free_cases,
+                price_per_case=ol.price_per_case,
+                discount_amount=ol.discount_amount,
+                line_total=ol.line_total,
+                original_words=ol.original_words,
+                unit=ol.unit,
+            )
+            for ol in lines
+        ],
+    )
 
 
 @app.get("/desk/orders/{order_id}", response_model=DeskOrderDetail)
@@ -912,9 +1044,10 @@ def patch_desk_order(
                     sku.stock_cases -= (ol.charged_cases + ol.free_cases)
                     session.add(sku)
 
-            # Update retailer balance
-            retailer.outstanding += order.total
-            session.add(retailer)
+            # Update retailer balance only if order was on credit_hold (not previously added to outstanding)
+            if order.status == OrderStatus.CREDIT_HOLD:
+                retailer.outstanding += order.total
+                session.add(retailer)
 
         order.status = target_status
 

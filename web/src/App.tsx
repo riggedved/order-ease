@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
 import { Header } from './components/Header';
 import { LoginScreen } from './components/LoginScreen';
 import { CatalogueScreen } from './components/CatalogueScreen';
@@ -14,6 +14,9 @@ import type {
   CartItem,
 } from './types';
 import { fetchMe, fetchCatalogue, fetchCartQuote } from './api';
+
+// Lazy-load ProfilePanel overlay
+const ProfilePanel = lazy(() => import('./components/ProfilePanel'));
 
 export function App() {
   // 1. Language State
@@ -47,8 +50,9 @@ export function App() {
     return null;
   });
 
-  // 3. Navigation View State: 'catalogue' | 'cart' | 'order_by_message'
-  const [currentView, setCurrentView] = useState<'catalogue' | 'cart' | 'order_by_message'>('catalogue');
+  // 3. Navigation View State: 'catalogue' | 'cart' | 'order_by_message' | 'profile'
+  const [currentView, setCurrentView] = useState<'catalogue' | 'cart' | 'order_by_message' | 'profile'>('catalogue');
+  const [previousView, setPreviousView] = useState<'catalogue' | 'cart' | 'order_by_message'>('catalogue');
 
   // 4. Catalogue State
   const [catalogue, setCatalogue] = useState<CatalogueSKU[]>([]);
@@ -76,6 +80,55 @@ export function App() {
   // 6. Order by message draft text (persists when navigating back to catalogue and returning)
   const [orderMessageDraft, setOrderMessageDraft] = useState('');
 
+  // 7. Profile Screen State
+  const [profileScrollToCredit, setProfileScrollToCredit] = useState(false);
+  const profileButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  // Preload ProfilePanel chunk when user is logged in
+  useEffect(() => {
+    if (token && user) {
+      import('./components/ProfilePanel');
+    }
+  }, [token, user]);
+
+  const handleOpenProfile = useCallback(() => {
+    setProfileScrollToCredit(false);
+    setPreviousView((prev) => (currentView !== 'profile' ? currentView : prev));
+    setCurrentView('profile');
+    if (window.history.state?.view !== 'profile') {
+      window.history.pushState({ view: 'profile' }, '');
+    }
+  }, [currentView]);
+
+  const handleOpenCredit = useCallback(() => {
+    setProfileScrollToCredit(true);
+    setPreviousView((prev) => (currentView !== 'profile' ? currentView : prev));
+    setCurrentView('profile');
+    if (window.history.state?.view !== 'profile') {
+      window.history.pushState({ view: 'profile' }, '');
+    }
+  }, [currentView]);
+
+  const handleBackFromProfile = useCallback(() => {
+    setCurrentView(previousView || 'catalogue');
+    if (window.history.state?.view === 'profile') {
+      window.history.back();
+    }
+  }, [previousView]);
+
+  // Listen to browser back button (popstate)
+  useEffect(() => {
+    const handlePopState = () => {
+      if (currentView === 'profile') {
+        setCurrentView(previousView || 'catalogue');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [currentView, previousView]);
+
   // Sync token / user state
   const handleLoginSuccess = (tokenData: TokenResponse) => {
     setToken(tokenData.access_token);
@@ -91,9 +144,20 @@ export function App() {
     };
     setUser(currentUser);
     localStorage.setItem('orderease_user', JSON.stringify(currentUser));
+
+    // Also fetch full user from GET /me to populate credit & salesman
+    fetchMe(tokenData.access_token)
+      .then((fullUser) => {
+        setUser(fullUser);
+        localStorage.setItem('orderease_user', JSON.stringify(fullUser));
+      })
+      .catch(() => {});
   };
 
   const handleLogout = () => {
+    if (window.history.state?.view === 'profile') {
+      window.history.back();
+    }
     setToken(null);
     setUser(null);
     setCartItems({});
@@ -110,6 +174,18 @@ export function App() {
     setQuote(null);
     setCartMessageNote(null);
   };
+
+  // Refresh user data with GET /me
+  const refreshUser = useCallback(() => {
+    if (token) {
+      fetchMe(token)
+        .then((userData) => {
+          setUser(userData);
+          localStorage.setItem('orderease_user', JSON.stringify(userData));
+        })
+        .catch(() => {});
+    }
+  }, [token]);
 
   // Refresh user data with GET /me if token is already present on initial mount
   useEffect(() => {
@@ -270,6 +346,9 @@ export function App() {
           lang={lang}
           onToggleLang={toggleLanguage}
           onLogout={handleLogout}
+          onOpenProfile={handleOpenProfile}
+          onOpenCredit={handleOpenCredit}
+          profileButtonRef={profileButtonRef}
         />
 
         {/* Main Content Area */}
@@ -303,8 +382,9 @@ export function App() {
               onDismissMessageNote={() => setCartMessageNote(null)}
               retailerId={user.retailer_id!}
               token={token}
+              onOrderPlaced={refreshUser}
             />
-          ) : (
+          ) : currentView === 'order_by_message' ? (
             <OrderByMessage
               lang={lang}
               retailerId={user.retailer_id!}
@@ -315,6 +395,19 @@ export function App() {
               onBackToCatalogue={() => setCurrentView('catalogue')}
               onAddToCart={handleAddCapturedItemsToCart}
             />
+          ) : (
+            <Suspense fallback={null}>
+              <ProfilePanel
+                user={user}
+                token={token}
+                lang={lang}
+                scrollToCredit={profileScrollToCredit}
+                onBack={handleBackFromProfile}
+                onToggleLang={toggleLanguage}
+                onLogout={handleLogout}
+                onOrderCancelled={refreshUser}
+              />
+            </Suspense>
           )}
         </main>
       </div>

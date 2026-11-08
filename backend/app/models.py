@@ -31,6 +31,7 @@ class OrderStatus(str, Enum):
     PENDING = "pending"
     CREDIT_HOLD = "credit_hold"
     APPROVED = "approved"
+    CANCELLED = "cancelled"
 
 
 class OrderSource(str, Enum):

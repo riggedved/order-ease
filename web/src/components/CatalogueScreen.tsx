@@ -161,10 +161,10 @@ export const CatalogueScreen: React.FC<CatalogueScreenProps> = ({
       <button
         type="button"
         onClick={onOpenOrderByMessage}
-        className="w-full min-tap h-12 px-4 border border-primary rounded-xl bg-white flex items-center justify-center space-x-2 text-primary font-bold text-sm hover:bg-primary-50 active:bg-primary-50 focus:outline-none transition-colors mb-1.5 select-none"
+        className="w-full min-tap h-12 px-4 border border-primary rounded-xl bg-primary flex items-center justify-center space-x-2 text-white font-bold text-sm hover:bg-primary-dark active:bg-primary-dark focus:outline-none transition-colors mb-1.5 select-none"
       >
         <svg
-          className="w-5 h-5 shrink-0 text-primary"
+          className="w-5 h-5 shrink-0 text-white"
           fill="none"
           stroke="currentColor"
           strokeWidth="2"
@@ -176,7 +176,7 @@ export const CatalogueScreen: React.FC<CatalogueScreenProps> = ({
             d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
           />
         </svg>
-        <span>{t.order_by_message}</span>
+        <span className="text-white">{t.order_by_message}</span>
       </button>
 
       {/* Pinned Search Bar & Category Filter Chips */}

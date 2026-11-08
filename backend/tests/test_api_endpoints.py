@@ -190,6 +190,108 @@ class TestOrdersLifecycle:
         assert response.status_code == 200
         assert response.json()["status"] == "pending"
 
+    def test_order_within_credit_limit_decreases_available_limit_by_order_value(self, client: TestClient):
+        """Orders within credit limit are placed normally (pending) and decrease available limit by order value."""
+        token = login_as(client, phone="9826011111")  # Retailer 1 (Gupta: limit=100,000, initial outstanding=25,000)
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # Check initial credit state: available = 75,000.00
+        me_before = client.get("/me", headers=headers).json()
+        assert float(me_before["credit_limit"]) == pytest.approx(100000.00)
+        assert float(me_before["outstanding"]) == pytest.approx(25000.00)
+        assert float(me_before["available_credit"]) == pytest.approx(75000.00)
+
+        # Place order for 10 cases of biscuit = 8,164.80 incl GST
+        payload = {
+            "retailer_id": 1,
+            "lines": [{"sku_code": "SKU-BS-075", "qty_cases": 10}],
+            "client_request_id": "req-gupta-limit-decrease-1",
+        }
+        res = client.post("/orders", json=payload, headers=headers)
+        assert res.status_code == 200
+        order_data = res.json()
+        assert order_data["status"] == "pending"
+        order_total = float(order_data["total"])
+        assert order_total == pytest.approx(8164.80)
+
+        # Verify limit decreased via /me
+        me_after = client.get("/me", headers=headers).json()
+        assert float(me_after["outstanding"]) == pytest.approx(25000.00 + order_total)
+        assert float(me_after["available_credit"]) == pytest.approx(75000.00 - order_total)
+
+        # Verify limit decreased via /retailers/1
+        ret_res = client.get("/retailers/1", headers=headers).json()
+        assert float(ret_res["outstanding"]) == pytest.approx(25000.00 + order_total)
+        available = float(ret_res["credit_limit"]) - float(ret_res["outstanding"])
+        assert available == pytest.approx(75000.00 - order_total)
+
+    def test_cancel_pending_order_restores_credit_limit(self, client: TestClient):
+        """Cancelling a pending order marks status as cancelled and restores the credit limit."""
+        token = login_as(client, phone="9826011111")  # Retailer 1
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # 1. Place order
+        res = client.post(
+            "/orders",
+            json={
+                "retailer_id": 1,
+                "lines": [{"sku_code": "SKU-BS-075", "qty_cases": 10}],
+                "client_request_id": "req-gupta-cancel-test-1",
+            },
+            headers=headers,
+        )
+        assert res.status_code == 200
+        order_id = res.json()["id"]
+        order_total = float(res.json()["total"])
+
+        # Check outstanding increased
+        me_after_place = client.get("/me", headers=headers).json()
+        assert float(me_after_place["outstanding"]) == pytest.approx(25000.00 + order_total)
+
+        # 2. Cancel order
+        cancel_res = client.post(f"/orders/{order_id}/cancel", headers=headers)
+        assert cancel_res.status_code == 200
+        cancelled_data = cancel_res.json()
+        assert cancelled_data["status"] == "cancelled"
+
+        # 3. Check outstanding restored to 25,000
+        me_after_cancel = client.get("/me", headers=headers).json()
+        assert float(me_after_cancel["outstanding"]) == pytest.approx(25000.00)
+        assert float(me_after_cancel["available_credit"]) == pytest.approx(75000.00)
+
+    def test_cancel_credit_hold_order(self, client: TestClient):
+        """Cancelling a credit_hold order marks status as cancelled without changing outstanding."""
+        token = login_as(client, phone="9826022222")  # Retailer 2 (Sharma)
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # Seeded order 2 is credit_hold for Sharma
+        cancel_res = client.post("/orders/2/cancel", headers=headers)
+        assert cancel_res.status_code == 200
+        assert cancel_res.json()["status"] == "cancelled"
+
+        # Sharma's outstanding remains 76,500.00
+        me_res = client.get("/me", headers=headers).json()
+        assert float(me_res["outstanding"]) == pytest.approx(76500.00)
+
+    def test_cancel_approved_order_fails(self, client: TestClient):
+        """Cannot cancel an approved order."""
+        token = login_as(client, phone="9826011111")  # Retailer 1 (Gupta owns seeded order 1)
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # Seeded order 1 is approved
+        res = client.post("/orders/1/cancel", headers=headers)
+        assert res.status_code == 400
+        assert "Cannot cancel" in res.json()["detail"]
+
+    def test_cancel_other_retailer_order_forbidden(self, client: TestClient):
+        """Retailer cannot cancel another retailer's order."""
+        token = login_as(client, phone="9826011111")  # Retailer 1
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # Order 2 belongs to Retailer 2 (Sharma)
+        res = client.post("/orders/2/cancel", headers=headers)
+        assert res.status_code == 403
+
     def test_duplicate_client_request_id_returns_same_order(self, client: TestClient):
         """duplicate client_request_id returns the same order."""
         token = login_as(client, phone="9826011111")
@@ -231,6 +333,105 @@ class TestOrdersLifecycle:
         # 10 cases * 777.60 = 7,776.00 + 5% GST (388.80) = 8,164.80
         assert float(data["total"]) == pytest.approx(8164.80)
         assert float(data["total"]) != 1.00
+
+    def test_get_my_orders_limit_parameter_and_newest_first(self, client: TestClient):
+        """GET /orders/mine with limit=3 returns at most 3 orders, newest first."""
+        token = login_as(client, phone="9826011111")  # Retailer 1 (Gupta)
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # Retailer 1 already has 1 seeded order (id=1)
+        # Create 3 more orders to have a total of 4 orders
+        res2 = client.post(
+            "/orders",
+            json={
+                "retailer_id": 1,
+                "lines": [{"sku_code": "SKU-BS-075", "qty_cases": 1}],
+                "client_request_id": "req-mine-order-2",
+            },
+            headers=headers,
+        )
+        assert res2.status_code == 200
+        order_2_id = res2.json()["id"]
+
+        res3 = client.post(
+            "/orders",
+            json={
+                "retailer_id": 1,
+                "lines": [{"sku_code": "SKU-BS-075", "qty_cases": 2}],
+                "client_request_id": "req-mine-order-3",
+            },
+            headers=headers,
+        )
+        assert res3.status_code == 200
+        order_3_id = res3.json()["id"]
+
+        res4 = client.post(
+            "/orders",
+            json={
+                "retailer_id": 1,
+                "lines": [{"sku_code": "SKU-BS-075", "qty_cases": 3}],
+                "client_request_id": "req-mine-order-4",
+            },
+            headers=headers,
+        )
+        assert res4.status_code == 200
+        order_4_id = res4.json()["id"]
+
+        # Without limit -> returns all 4 orders
+        all_orders = client.get("/orders/mine", headers=headers).json()
+        assert len(all_orders) == 4
+
+        # With limit=3 -> returns at most 3 orders, newest first
+        res_limit3 = client.get("/orders/mine?limit=3", headers=headers)
+        assert res_limit3.status_code == 200
+        orders_3 = res_limit3.json()
+        assert len(orders_3) == 3
+
+        # Newest first: order 4, order 3, order 2
+        assert orders_3[0]["id"] == order_4_id
+        assert orders_3[1]["id"] == order_3_id
+        assert orders_3[2]["id"] == order_2_id
+
+    def test_retailer_never_sees_another_retailers_data_returns_403(self, client: TestClient):
+        """A retailer never sees another retailer's data (403)."""
+        token_1 = login_as(client, phone="9826011111")  # Retailer 1
+        headers_1 = {"Authorization": f"Bearer {token_1}"}
+
+        # 1. Retailer profile: GET /retailers/2 -> 403
+        res_profile = client.get("/retailers/2", headers=headers_1)
+        assert res_profile.status_code == 403
+
+        # 2. Catalogue: GET /catalogue?retailer_id=2 -> 403
+        res_cat = client.get("/catalogue?retailer_id=2", headers=headers_1)
+        assert res_cat.status_code == 403
+
+        # 3. Cart quote: POST /cart/quote for retailer 2 -> 403
+        res_quote = client.post(
+            "/cart/quote",
+            json={"retailer_id": 2, "lines": [{"sku_code": "SKU-BS-075", "qty_cases": 1}]},
+            headers=headers_1,
+        )
+        assert res_quote.status_code == 403
+
+        # 4. Order creation: POST /orders for retailer 2 -> 403
+        res_order = client.post(
+            "/orders",
+            json={
+                "retailer_id": 2,
+                "lines": [{"sku_code": "SKU-BS-075", "qty_cases": 1}],
+                "client_request_id": "unauth-order-attempt",
+            },
+            headers=headers_1,
+        )
+        assert res_order.status_code == 403
+
+        # 5. Capture: POST /capture for retailer 2 -> 403
+        res_cap = client.post(
+            "/capture",
+            json={"retailer_id": 2, "text": "5 peti biscuit"},
+            headers=headers_1,
+        )
+        assert res_cap.status_code == 403
 
 
 class TestDeskEndpointsAndPermissions:

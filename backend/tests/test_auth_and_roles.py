@@ -63,8 +63,8 @@ class TestAuthAndOTP:
         assert data["retailer_id"] is None
 
     def test_get_me_returns_user_info_for_retailer_and_staff(self, client: TestClient):
-        """GET /me returns user id, name, role, retailer_id and retailer_name for logged-in user."""
-        # 1. Retailer
+        """GET /me returns user profile with phone, salesman details, and credit_low."""
+        # 1. Retailer (Gupta: limit 100000, outstanding 25000 -> credit_low=False)
         ret_token = login_as(client, phone="9826011111")
         res_ret = client.get("/me", headers={"Authorization": f"Bearer {ret_token}"})
         assert res_ret.status_code == 200
@@ -73,9 +73,13 @@ class TestAuthAndOTP:
         assert ret_data["role"] == "retailer"
         assert ret_data["retailer_id"] == 1
         assert ret_data["retailer_name"] == "Gupta Kirana Store"
+        assert ret_data["phone"] == "9826011111"
+        assert ret_data["salesman_name"] == "Salesman Rahul Verma"
+        assert ret_data["salesman_phone"] == "9826000002"
+        assert ret_data["credit_low"] is False
         assert ret_data["id"] is not None
 
-        # 2. Desk user
+        # 2. Desk user (staff: phone, salesman details, credit_low are null)
         desk_token = login_as(client, phone="9826000001")
         res_desk = client.get("/me", headers={"Authorization": f"Bearer {desk_token}"})
         assert res_desk.status_code == 200
@@ -84,11 +88,97 @@ class TestAuthAndOTP:
         assert desk_data["role"] == "order_desk"
         assert desk_data["retailer_id"] is None
         assert desk_data["retailer_name"] is None
+        assert desk_data["phone"] is None
+        assert desk_data["salesman_name"] is None
+        assert desk_data["salesman_phone"] is None
+        assert desk_data["credit_low"] is None
         assert desk_data["id"] is not None
 
         # 3. Unauthenticated -> 401
         res_unauth = client.get("/me")
         assert res_unauth.status_code == 401
+
+    def test_get_me_sharma_credit_low_true(self, client: TestClient):
+        """Sharma (limit 80000, outstanding 76500) has credit_low true.
+
+        available_credit = 80000 - 76500 = 3500.
+        10% of 80000 is 8000.
+        3500 < 8000 -> credit_low is True.
+        """
+        token = login_as(client, phone="9826022222")
+        res = client.get("/me", headers={"Authorization": f"Bearer {token}"})
+        assert res.status_code == 200
+        data = res.json()
+        assert data["name"] == "Suresh Sharma"
+        assert data["phone"] == "9826022222"
+        assert data["retailer_name"] == "Sharma Provision Store"
+        assert data["salesman_name"] == "Salesman Rahul Verma"
+        assert data["salesman_phone"] == "9826000002"
+        assert data["credit_low"] is True
+
+    def test_get_me_gupta_credit_low_false_and_salesman_matches_seed(self, client: TestClient):
+        """Gupta (limit 100000, outstanding 25000) has credit_low false and salesman fields match seed.
+
+        available_credit = 100000 - 25000 = 75000.
+        10% of 100000 is 10000.
+        75000 >= 10000 -> credit_low is False.
+        """
+        token = login_as(client, phone="9826011111")
+        res = client.get("/me", headers={"Authorization": f"Bearer {token}"})
+        assert res.status_code == 200
+        data = res.json()
+        assert data["name"] == "Ramesh Gupta"
+        assert data["phone"] == "9826011111"
+        assert data["retailer_name"] == "Gupta Kirana Store"
+        assert data["salesman_name"] == "Salesman Rahul Verma"
+        assert data["salesman_phone"] == "9826000002"
+        assert data["credit_low"] is False
+
+    def test_get_me_unassigned_salesman_returns_null(self, client: TestClient):
+        """Retailer without assigned salesman returns salesman_name and salesman_phone as null."""
+        # Verma General Stores (retailer 3, phone 9826033333, unassigned salesman)
+        token = login_as(client, phone="9826033333")
+        res = client.get("/me", headers={"Authorization": f"Bearer {token}"})
+        assert res.status_code == 200
+        data = res.json()
+        assert data["name"] == "Anil Verma"
+        assert data["phone"] == "9826033333"
+        assert data["retailer_name"] == "Verma General Stores"
+        assert data["salesman_name"] is None
+        assert data["salesman_phone"] is None
+        assert data["credit_low"] is False
+
+    def test_get_me_staff_fields_are_null(self, client: TestClient):
+        """For staff (order_desk, salesman, owner), phone, salesman details and credit_low are null."""
+        # Desk Officer Priya
+        token_desk = login_as(client, phone="9826000001")
+        res_desk = client.get("/me", headers={"Authorization": f"Bearer {token_desk}"})
+        assert res_desk.status_code == 200
+        data_desk = res_desk.json()
+        assert data_desk["phone"] is None
+        assert data_desk["salesman_name"] is None
+        assert data_desk["salesman_phone"] is None
+        assert data_desk["credit_low"] is None
+
+        # Salesman Rahul Verma
+        token_salesman = login_as(client, phone="9826000002")
+        res_salesman = client.get("/me", headers={"Authorization": f"Bearer {token_salesman}"})
+        assert res_salesman.status_code == 200
+        data_salesman = res_salesman.json()
+        assert data_salesman["phone"] is None
+        assert data_salesman["salesman_name"] is None
+        assert data_salesman["salesman_phone"] is None
+        assert data_salesman["credit_low"] is None
+
+        # Owner Rajesh Agarwal
+        token_owner = login_as(client, phone="9826000003")
+        res_owner = client.get("/me", headers={"Authorization": f"Bearer {token_owner}"})
+        assert res_owner.status_code == 200
+        data_owner = res_owner.json()
+        assert data_owner["phone"] is None
+        assert data_owner["salesman_name"] is None
+        assert data_owner["salesman_phone"] is None
+        assert data_owner["credit_low"] is None
 
     def test_unregistered_phone_returns_401(self, client: TestClient):
         """Unregistered phone number with OTP 123456 returns 401."""

@@ -1,48 +1,57 @@
-import React, { useState } from 'react';
+import React from 'react';
 import type { Language } from '../i18n';
 import { translations } from '../i18n';
 import type { UserMe } from '../types';
+import { formatINRPill } from '../utils';
 
-interface HeaderProps {
+export interface HeaderProps {
   user: UserMe | null;
   lang: Language;
   onToggleLang: () => void;
   onLogout: () => void;
+  onOpenProfile?: () => void;
+  onOpenCredit?: () => void;
+  profileButtonRef?: React.RefObject<HTMLButtonElement | null>;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   user,
   lang,
   onToggleLang,
-  onLogout,
+  onOpenProfile,
+  onOpenCredit,
+  profileButtonRef,
 }) => {
-  const [menuOpen, setMenuOpen] = useState(false);
   const t = translations[lang];
 
-  return (
-    <>
-      <header className="px-4 py-2.5 border-b border-border bg-surface sticky top-0 z-30 flex items-center justify-between h-14 min-h-[56px] select-none">
-        {/* Left Side */}
-        <div className="flex flex-col min-w-0 pr-2">
-          {!user ? (
-            <span className="font-bold text-lg text-ink tracking-tight">
-              {t.company_name}
-            </span>
-          ) : (
-            <div className="flex flex-col min-w-0">
-              <span className="text-[11px] font-medium text-ink-muted leading-tight truncate">
-                {t.ordering_from}
-              </span>
-              <h1 className="text-base font-bold text-ink leading-tight truncate">
-                {user.retailer_name || user.name || t.retailer_label}
-              </h1>
-            </div>
-          )}
-        </div>
+  // Derive available credit text if data loaded successfully
+  const availableCreditText =
+    user?.available_credit != null ? formatINRPill(user.available_credit) : null;
 
-        {/* Right Side: Language Toggle & Menu */}
-        <div className="flex items-center space-x-2 shrink-0">
-          {/* Two-part segmented Language Switch "EN | हिं" on one line: identical size & weight */}
+  return (
+    <header className="px-4 py-2.5 border-b border-border bg-surface sticky top-0 z-30 flex items-center justify-between h-14 min-h-[56px] select-none">
+      {/* Left Side */}
+      <div className="flex flex-col min-w-0 pr-2 flex-1 justify-center">
+        {!user ? (
+          <span className="font-bold text-lg text-ink tracking-tight">
+            {t.company_name}
+          </span>
+        ) : (
+          <>
+            <span className="text-[11px] font-medium text-ink-muted leading-tight truncate">
+              {t.ordering_from}
+            </span>
+            <h1 className="text-base font-bold text-ink leading-tight truncate">
+              {user.retailer_name || user.name || t.retailer_label}
+            </h1>
+          </>
+        )}
+      </div>
+
+      {/* Right Side: Credit Button + Profile Button for retailer, Language toggle for login screen */}
+      <div className="flex items-center gap-2 shrink-0">
+        {!user ? (
+          /* Keep language toggle on login screen */
           <div
             className="border border-border rounded-xl p-0.5 inline-flex items-center bg-white h-9 select-none shrink-0"
             role="group"
@@ -78,14 +87,49 @@ export const Header: React.FC<HeaderProps> = ({
               हिं
             </button>
           </div>
+        ) : (
+          <>
+            {availableCreditText && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenCredit?.();
+                }}
+                className={`min-tap h-12 px-3 rounded-xl select-none transition-colors border flex items-center gap-1.5 text-xs font-bold shrink-0 ${
+                  user.credit_low
+                    ? 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200 active:bg-amber-200'
+                    : 'bg-[#E8F5E9] text-[#0C6B1A] border-green-200 hover:bg-green-100 active:bg-green-100'
+                }`}
+                aria-label={`${availableCreditText} ${t.credit_left}`}
+              >
+                <svg
+                  className="w-4 h-4 shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <rect x="2" y="6" width="20" height="12" rx="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <circle cx="12" cy="12" r="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <line x1="6" y1="12" x2="6.01" y2="12" strokeLinecap="round" strokeLinejoin="round" />
+                  <line x1="18" y1="12" x2="18.01" y2="12" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <span>{availableCreditText} {t.credit_left}</span>
+              </button>
+            )}
 
-          {/* Menu Button (when logged in or general) */}
-          {user && (
+            {/* One 48px outlined profile icon button (circular, inline SVG person icon, aria-label "Profile") */}
             <button
               type="button"
-              onClick={() => setMenuOpen(true)}
-              className="min-tap w-12 h-12 flex items-center justify-center border border-border rounded-xl text-ink hover:bg-gray-50 focus:outline-none transition-colors"
-              aria-label={t.menu}
+              ref={profileButtonRef}
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenProfile?.();
+              }}
+              className="min-tap w-12 h-12 flex items-center justify-center border border-border rounded-full text-ink hover:bg-gray-50 focus:outline-none focus:border-primary transition-colors select-none shrink-0"
+              aria-label={t.profile}
             >
               <svg
                 className="w-5 h-5 text-ink"
@@ -93,80 +137,18 @@ export const Header: React.FC<HeaderProps> = ({
                 stroke="currentColor"
                 strokeWidth="2"
                 viewBox="0 0 24 24"
+                aria-hidden="true"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                />
               </svg>
             </button>
-          )}
-        </div>
-      </header>
-
-      {/* Side Menu Drawer */}
-      {menuOpen && (
-        <div
-          className="fixed inset-0 z-50 bg-black/40 flex justify-end"
-          onClick={() => setMenuOpen(false)}
-        >
-          <div
-            className="w-72 bg-white h-full p-5 flex flex-col justify-between border-l border-border"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div>
-              <div className="flex items-center justify-between pb-3 border-b border-border">
-                <span className="font-bold text-base text-ink">
-                  {t.company_name}
-                </span>
-                <button
-                  type="button"
-                  className="min-tap w-10 h-10 flex items-center justify-center text-ink-muted hover:text-ink text-lg font-bold"
-                  onClick={() => setMenuOpen(false)}
-                  aria-label={t.close}
-                >
-                  ✕
-                </button>
-              </div>
-
-              {user && (
-                <div className="mt-4 p-3.5 bg-gray-50 rounded-xl border border-border space-y-1.5">
-                  <div className="text-xs text-ink-muted">{t.retailer_label}</div>
-                  <div className="text-sm font-bold text-ink break-words">
-                    {user.retailer_name || user.name}
-                  </div>
-                  <div className="text-xs text-ink-muted pt-1">
-                    {t.user_role}: <span className="font-medium text-ink">{user.role}</span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="pt-4 border-t border-border">
-              <button
-                type="button"
-                onClick={() => {
-                  setMenuOpen(false);
-                  onLogout();
-                }}
-                className="w-full min-tap py-3 px-4 rounded-xl border border-error text-error font-semibold text-sm flex items-center justify-center hover:bg-error-bg transition-colors"
-              >
-                <svg
-                  className="w-4 h-4 mr-2"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                  />
-                </svg>
-                {t.logout}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
+          </>
+        )}
+      </div>
+    </header>
   );
 };

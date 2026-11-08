@@ -200,5 +200,12 @@ class UserMeResponse(BaseModel):
     role: str
     retailer_id: Optional[int] = None
     retailer_name: Optional[str] = None
+    phone: Optional[str] = None
+    salesman_name: Optional[str] = None
+    salesman_phone: Optional[str] = None
+    credit_low: Optional[bool] = None
+    credit_limit: Optional[Decimal] = None
+    outstanding: Optional[Decimal] = None
+    available_credit: Optional[Decimal] = None
 
 

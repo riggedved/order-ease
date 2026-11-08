@@ -58,10 +58,12 @@ Build screens for retailer and order_desk only. Salesman and owner are data-mode
 ## Orders
 - `POST /orders` re-quotes on the server and ignores client totals.
 - If outstanding + payable > credit_limit, status is `credit_hold`, else `pending`.
+- Orders within credit limit are placed normally (`pending`) and decrease available credit by adding the order value to `retailer.outstanding`.
 - `client_request_id` is idempotent: the same ID returns the same order.
 - Stock is reduced only on desk/owner approval, and approval re-checks stock including free cases (refuse if it would go negative).
 - Approving a `credit_hold` order needs `override_flag=true` and a non-empty `override_reason`, both stored.
 - Retailers may only send source `retailer_app` or `retailer_capture`, and only for themselves.
+- `POST /orders/{order_id}/cancel`: Retailers can cancel their own orders with status `pending` or `credit_hold`. Cancelling a `pending` order restores the retailer's available credit (`retailer.outstanding -= order.total`). Status becomes `cancelled`.
 
 ## AI capture
 - `POST /capture` parses text and returns lines plus a preview quote. It creates NO order. Only a capture log is saved.
@@ -73,10 +75,12 @@ Build screens for retailer and order_desk only. Salesman and owner are data-mode
 - Retailer capture is forced to their own retailer_id. Desk and owner may pass any.
 
 ## API
-Built: `POST /auth/otp`, `GET /me`, `GET /catalogue`, `POST /cart/quote`, `POST /orders`, `GET /orders/mine`, `GET /retailers` (desk/owner), `GET /desk/orders`, `GET /desk/orders/{id}`, `PATCH /desk/orders/{id}`, `POST /capture` (rule & LLM parsers), `GET /desk/export/tally` (XML/CSV).
+Built: `POST /auth/otp`, `GET /me`, `GET /catalogue`, `POST /cart/quote`, `POST /orders`, `POST /orders/{order_id}/cancel`, `GET /orders/mine`, `GET /retailers` (desk/owner), `GET /desk/orders`, `GET /desk/orders/{id}`, `PATCH /desk/orders/{id}`, `POST /capture` (rule & LLM parsers), `GET /desk/export/tally` (XML/CSV).
 Planned: none (core slice complete).
 Later: `GET /retailers/{id}`, `GET /retailers/{id}/orders`.
 Auth: mock OTP `123456`, JWT with user_id, role, retailer_id. Wrong OTP gives 401.
+Profile: `GET /me` returns user profile. For retailer users, returns `phone`, `salesman_name`, `salesman_phone` (null if unassigned), `credit_low` (true when `available_credit` is below 10% of `credit_limit`), `credit_limit`, `outstanding`, and `available_credit`. For staff users, these are null.
+Orders: `GET /orders/mine` returns a retailer's own orders, newest first; accepts optional `limit` query parameter (e.g. `limit=3`). A retailer never sees another retailer's data (403).
 Catalogue never returns exact stock numbers to retailers, only in_stock, low (10 or fewer) or out.
 
 ## Design

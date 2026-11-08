@@ -48,6 +48,13 @@ export interface UserMe {
   role: string;
   retailer_id: number | null;
   retailer_name: string | null;
+  phone?: string | null;
+  salesman_name?: string | null;
+  salesman_phone?: string | null;
+  credit_low?: boolean | null;
+  available_credit?: number | string | null;
+  credit_limit?: number | string | null;
+  outstanding?: number | string | null;
 }
 
 export interface TokenResponse {
@@ -125,8 +132,9 @@ export interface OrderResponse {
   id: number;
   retailer_id: number;
   retailer_name: string;
-  status: 'pending' | 'credit_hold' | 'approved';
+  status: 'pending' | 'credit_hold' | 'approved' | 'cancelled';
   source: string;
+  created_at?: string;
   total: string | number;
   client_request_id?: string | null;
   lines?: OrderResponseLine[];

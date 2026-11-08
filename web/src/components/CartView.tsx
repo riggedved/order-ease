@@ -24,6 +24,7 @@ interface CartViewProps {
   onDismissMessageNote?: () => void;
   retailerId: number;
   token: string;
+  onOrderPlaced?: () => void;
 }
 
 export const CartView: React.FC<CartViewProps> = ({
@@ -39,6 +40,7 @@ export const CartView: React.FC<CartViewProps> = ({
   onDismissMessageNote,
   retailerId,
   token,
+  onOrderPlaced,
 }) => {
   const t = translations[lang];
 
@@ -99,6 +101,7 @@ export const CartView: React.FC<CartViewProps> = ({
       clientRequestIdRef.current = null;
       onClearCart();
       setOrderSuccess(order);
+      onOrderPlaced?.();
     } catch (err: any) {
       // Re-use clientRequestIdRef.current on retry so idempotency is maintained
       if (err instanceof ApiError) {
