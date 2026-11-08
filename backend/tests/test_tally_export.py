@@ -303,8 +303,14 @@ class TestTallyExportEndpoint:
         root3 = ET.fromstring(res3.text)
         assert root3.find(f".//VOUCHER[VOUCHERNUMBER='{order.id}']") is not None
 
-    def test_retailer_and_salesman_calling_endpoint_gets_403(self, client: TestClient):
+    def test_retailer_and_salesman_calling_endpoint_gets_403(self, client: TestClient, session):
         """Retailer and salesman calling GET /desk/export/tally get 403."""
+        from backend.app.models import User, Role
+        salesman_user = User(phone="9826000002", name="Salesman Rahul Verma", role=Role.SALESMAN)
+        owner_user = User(phone="9826000003", name="Owner Rajesh Agarwal", role=Role.OWNER)
+        session.add_all([salesman_user, owner_user])
+        session.commit()
+
         # Retailer
         ret_token = login_as(client, phone="9826011111")
         res_ret = client.get(

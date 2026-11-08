@@ -58,7 +58,7 @@ class TestAuthAndOTP:
         assert response.status_code == 200
         data = response.json()
         assert data["role"] == "order_desk"
-        assert data["user_name"] == "Desk Officer Priya"
+        assert data["user_name"] == "Desk Officer"
         assert data["retailer_name"] is None
         assert data["retailer_id"] is None
 
@@ -74,8 +74,8 @@ class TestAuthAndOTP:
         assert ret_data["retailer_id"] == 1
         assert ret_data["retailer_name"] == "Gupta Kirana Store"
         assert ret_data["phone"] == "9826011111"
-        assert ret_data["salesman_name"] == "Salesman Rahul Verma"
-        assert ret_data["salesman_phone"] == "9826000002"
+        assert ret_data["salesman_name"] is None
+        assert ret_data["salesman_phone"] is None
         assert ret_data["credit_low"] is False
         assert ret_data["id"] is not None
 
@@ -84,7 +84,7 @@ class TestAuthAndOTP:
         res_desk = client.get("/me", headers={"Authorization": f"Bearer {desk_token}"})
         assert res_desk.status_code == 200
         desk_data = res_desk.json()
-        assert desk_data["name"] == "Desk Officer Priya"
+        assert desk_data["name"] == "Desk Officer"
         assert desk_data["role"] == "order_desk"
         assert desk_data["retailer_id"] is None
         assert desk_data["retailer_name"] is None
@@ -112,12 +112,12 @@ class TestAuthAndOTP:
         assert data["name"] == "Suresh Sharma"
         assert data["phone"] == "9826022222"
         assert data["retailer_name"] == "Sharma Provision Store"
-        assert data["salesman_name"] == "Salesman Rahul Verma"
-        assert data["salesman_phone"] == "9826000002"
+        assert data["salesman_name"] is None
+        assert data["salesman_phone"] is None
         assert data["credit_low"] is True
 
     def test_get_me_gupta_credit_low_false_and_salesman_matches_seed(self, client: TestClient):
-        """Gupta (limit 100000, outstanding 25000) has credit_low false and salesman fields match seed.
+        """Gupta (limit 100000, outstanding 25000) has credit_low false.
 
         available_credit = 100000 - 25000 = 75000.
         10% of 100000 is 10000.
@@ -130,27 +130,32 @@ class TestAuthAndOTP:
         assert data["name"] == "Ramesh Gupta"
         assert data["phone"] == "9826011111"
         assert data["retailer_name"] == "Gupta Kirana Store"
-        assert data["salesman_name"] == "Salesman Rahul Verma"
-        assert data["salesman_phone"] == "9826000002"
-        assert data["credit_low"] is False
-
-    def test_get_me_unassigned_salesman_returns_null(self, client: TestClient):
-        """Retailer without assigned salesman returns salesman_name and salesman_phone as null."""
-        # Verma General Stores (retailer 3, phone 9826033333, unassigned salesman)
-        token = login_as(client, phone="9826033333")
-        res = client.get("/me", headers={"Authorization": f"Bearer {token}"})
-        assert res.status_code == 200
-        data = res.json()
-        assert data["name"] == "Anil Verma"
-        assert data["phone"] == "9826033333"
-        assert data["retailer_name"] == "Verma General Stores"
         assert data["salesman_name"] is None
         assert data["salesman_phone"] is None
         assert data["credit_low"] is False
 
-    def test_get_me_staff_fields_are_null(self, client: TestClient):
+    def test_get_me_unassigned_salesman_returns_null(self, client: TestClient):
+        """Retailer without assigned salesman returns salesman_name and salesman_phone as null."""
+        token = login_as(client, phone="9826011111")
+        res = client.get("/me", headers={"Authorization": f"Bearer {token}"})
+        assert res.status_code == 200
+        data = res.json()
+        assert data["name"] == "Ramesh Gupta"
+        assert data["phone"] == "9826011111"
+        assert data["retailer_name"] == "Gupta Kirana Store"
+        assert data["salesman_name"] is None
+        assert data["salesman_phone"] is None
+        assert data["credit_low"] is False
+
+    def test_get_me_staff_fields_are_null(self, client: TestClient, session):
         """For staff (order_desk, salesman, owner), phone, salesman details and credit_low are null."""
-        # Desk Officer Priya
+        from backend.app.models import User, Role
+        salesman_user = User(phone="9826000002", name="Salesman Rahul Verma", role=Role.SALESMAN)
+        owner_user = User(phone="9826000003", name="Owner Rajesh Agarwal", role=Role.OWNER)
+        session.add_all([salesman_user, owner_user])
+        session.commit()
+
+        # Desk Officer
         token_desk = login_as(client, phone="9826000001")
         res_desk = client.get("/me", headers={"Authorization": f"Bearer {token_desk}"})
         assert res_desk.status_code == 200
@@ -226,12 +231,19 @@ class TestRoleBasedAccessControl:
         retailers_res = client.get("/desk/retailers", headers=headers)
         assert retailers_res.status_code == 403
 
-    def test_salesman_requesting_unassigned_retailer_returns_403(self, client: TestClient):
-        """salesman requesting an unassigned retailer -> 403.
+    def test_salesman_requesting_unassigned_retailer_returns_403(self, client: TestClient, session):
+        """salesman requesting an unassigned retailer -> 403."""
+        from backend.app.models import User, Role, Retailer
+        # Create test salesman assigned to Retailer 1 only
+        salesman_user = User(phone="9826000002", name="Salesman Rahul Verma", role=Role.SALESMAN)
+        session.add(salesman_user)
+        session.commit()
 
-        Salesman Rahul (phone: 9826000002) is assigned to Retailer 1 and Retailer 2,
-        but NOT to Retailer 3 or Retailer 4.
-        """
+        ret1 = session.get(Retailer, 1)
+        ret1.salesman_id = salesman_user.id
+        session.add(ret1)
+        session.commit()
+
         salesman_token = login_as(client, phone="9826000002")  # Salesman
         headers = {"Authorization": f"Bearer {salesman_token}"}
 
@@ -240,23 +252,18 @@ class TestRoleBasedAccessControl:
         assert assigned_res.status_code == 200
         assert assigned_res.json()["id"] == 1
 
-        # Assigned store (Retailer 2) -> 200 OK
-        assigned_res2 = client.get("/retailers/2", headers=headers)
-        assert assigned_res2.status_code == 200
-        assert assigned_res2.json()["id"] == 2
+        # Unassigned store (Retailer 2) -> 403 Forbidden
+        unassigned_res2 = client.get("/retailers/2", headers=headers)
+        assert unassigned_res2.status_code == 403
+        assert "Forbidden" in unassigned_res2.json()["detail"]
 
-        # Unassigned store (Retailer 3) -> 403 Forbidden
-        unassigned_res3 = client.get("/retailers/3", headers=headers)
-        assert unassigned_res3.status_code == 403
-        assert "Forbidden" in unassigned_res3.json()["detail"]
-
-        # Unassigned store (Retailer 4) -> 403 Forbidden
-        unassigned_res4 = client.get("/retailers/4", headers=headers)
-        assert unassigned_res4.status_code == 403
-        assert "Forbidden" in unassigned_res4.json()["detail"]
-
-    def test_order_desk_and_owner_access(self, client: TestClient):
+    def test_order_desk_and_owner_access(self, client: TestClient, session):
         """order_desk and owner can access /desk and any retailer."""
+        from backend.app.models import User, Role
+        owner_user = User(phone="9826000003", name="Owner Rajesh Agarwal", role=Role.OWNER)
+        session.add(owner_user)
+        session.commit()
+
         desk_token = login_as(client, phone="9826000001")  # Order Desk
         desk_headers = {"Authorization": f"Bearer {desk_token}"}
 
@@ -266,8 +273,8 @@ class TestRoleBasedAccessControl:
         assert len(desk_orders.json()) >= 2
 
         # Desk can access any retailer
-        desk_ret3 = client.get("/retailers/3", headers=desk_headers)
-        assert desk_ret3.status_code == 200
+        desk_ret1 = client.get("/retailers/1", headers=desk_headers)
+        assert desk_ret1.status_code == 200
 
         # Owner can access /desk/orders and any retailer
         owner_token = login_as(client, phone="9826000003")  # Owner
@@ -276,8 +283,8 @@ class TestRoleBasedAccessControl:
         owner_orders = client.get("/desk/orders", headers=owner_headers)
         assert owner_orders.status_code == 200
 
-        owner_ret4 = client.get("/retailers/4", headers=owner_headers)
-        assert owner_ret4.status_code == 200
+        owner_ret2 = client.get("/retailers/2", headers=owner_headers)
+        assert owner_ret2.status_code == 200
 
 
 class TestSeededDataAndTempDatabase:

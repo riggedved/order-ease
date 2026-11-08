@@ -9,6 +9,31 @@ interface LoginScreenProps {
   onLoginSuccess: (tokenData: TokenResponse) => void;
 }
 
+interface DemoAccount {
+  phone: string;
+  name: string;
+  role?: string;
+}
+
+const DEMO_STAFF: DemoAccount[] = [
+  {
+    phone: '9826000001',
+    name: 'Desk Officer',
+    role: 'Order Desk',
+  },
+];
+
+const DEMO_RETAILERS: DemoAccount[] = [
+  {
+    phone: '9826011111',
+    name: 'Gupta Kirana Store',
+  },
+  {
+    phone: '9826022222',
+    name: 'Sharma Provision Store',
+  },
+];
+
 export const LoginScreen: React.FC<LoginScreenProps> = ({
   lang,
   onLoginSuccess,
@@ -218,11 +243,90 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             </button>
           </form>
 
-          {/* Quick Demo Helper */}
-          <div className="mt-8 p-3 bg-gray-50 border border-border rounded-xl text-small text-ink-muted space-y-1">
-            <div className="font-semibold text-ink">Demo Accounts:</div>
-            <div>• 9826011111 (Gupta Kirana Store)</div>
-            <div>• 9826022222 (Sharma Provision Store)</div>
+          {/* Quick Demo Accounts Helper */}
+          <div className="mt-6 p-3.5 bg-gray-50 border border-border rounded-xl text-small space-y-3">
+            <div className="pb-1 border-b border-border/60">
+              <span className="font-bold text-ink">
+                {lang === 'hi' ? 'डेमो खाते (क्लिक करें):' : 'Demo Accounts (tap to fill):'}
+              </span>
+            </div>
+
+            {/* Staff / Desk Section */}
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted mb-1.5">
+                {lang === 'hi' ? 'स्टाफ एवं ऑर्डर डेस्क' : 'Staff & Order Desk'}
+              </div>
+              <div className="grid grid-cols-1 gap-1.5">
+                {DEMO_STAFF.map((acc) => {
+                  const isSelected = phone === acc.phone;
+                  return (
+                    <button
+                      key={acc.phone}
+                      type="button"
+                      onClick={() => {
+                        setPhone(acc.phone);
+                        setPhoneError(null);
+                      }}
+                      className={`w-full text-left px-2.5 py-1.5 rounded-lg border transition-all flex items-center justify-between ${
+                        isSelected
+                          ? 'border-primary bg-primary-50 text-ink shadow-none font-medium'
+                          : 'border-border/80 bg-white hover:border-primary/50 text-ink'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <span className="text-[13px] font-medium text-ink truncate">
+                          {acc.name}
+                        </span>
+                        {acc.role && (
+                          <span className="text-[11px] px-1.5 py-0.5 rounded bg-gray-100 text-ink-muted shrink-0">
+                            {acc.role}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[12px] text-ink-muted tabular-nums shrink-0 ml-2">
+                        {acc.phone}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Kirana Retailers Section */}
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted mb-1.5">
+                {lang === 'hi' ? 'किराना विक्रेता' : 'Kirana Retailers'}
+              </div>
+              <div className="grid grid-cols-1 gap-1.5">
+                {DEMO_RETAILERS.map((acc) => {
+                  const isSelected = phone === acc.phone;
+                  return (
+                    <button
+                      key={acc.phone}
+                      type="button"
+                      onClick={() => {
+                        setPhone(acc.phone);
+                        setPhoneError(null);
+                      }}
+                      className={`w-full text-left px-2.5 py-1.5 rounded-lg border transition-all flex items-center justify-between ${
+                        isSelected
+                          ? 'border-primary bg-primary-50 text-ink shadow-none font-medium'
+                          : 'border-border/80 bg-white hover:border-primary/50 text-ink'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 truncate">
+                        <span className="text-[13px] font-medium text-ink truncate">
+                          {acc.name}
+                        </span>
+                      </div>
+                      <span className="text-[12px] text-ink-muted tabular-nums shrink-0 ml-2">
+                        {acc.phone}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </section>
       ) : (

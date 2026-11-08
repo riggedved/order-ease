@@ -144,60 +144,32 @@ def seed_data_if_empty(session: Session) -> None:
         session.add(s)
     session.commit()
 
-    # 2. Staff Users (Desk, Salesman, Owner)
+    # 2. Staff Users (Desk only)
     desk_user = User(
         phone="9826000001",
-        name="Desk Officer Priya",
+        name="Desk Officer",
         role=Role.ORDER_DESK,
         retailer_id=None,
     )
-    salesman_user = User(
-        phone="9826000002",
-        name="Salesman Rahul Verma",
-        role=Role.SALESMAN,
-        retailer_id=None,
-    )
-    owner_user = User(
-        phone="9826000003",
-        name="Owner Rajesh Agarwal",
-        role=Role.OWNER,
-        retailer_id=None,
-    )
     session.add(desk_user)
-    session.add(salesman_user)
-    session.add(owner_user)
     session.commit()
 
-    # 3. 4 Retailers (One close to its limit, salesman assigned to 2)
+    # 3. 2 Retailers (Gupta Kirana Store and Sharma Provision Store)
     retailer_1 = Retailer(
         name="Gupta Kirana Store",
         phone="9826011111",
         credit_limit=Decimal("100000.00"),
         outstanding=Decimal("25000.00"),
-        salesman_id=salesman_user.id,  # Assigned to salesman
+        salesman_id=None,
     )
     retailer_2 = Retailer(
         name="Sharma Provision Store",
         phone="9826022222",
         credit_limit=Decimal("80000.00"),
         outstanding=Decimal("76500.00"),  # Close to limit! (95.6% utilized)
-        salesman_id=salesman_user.id,  # Assigned to salesman
+        salesman_id=None,
     )
-    retailer_3 = Retailer(
-        name="Verma General Stores",
-        phone="9826033333",
-        credit_limit=Decimal("50000.00"),
-        outstanding=Decimal("12000.00"),
-        salesman_id=None,  # Unassigned
-    )
-    retailer_4 = Retailer(
-        name="Jabalpur Daily Mart",
-        phone="9826044444",
-        credit_limit=Decimal("120000.00"),
-        outstanding=Decimal("35000.00"),
-        salesman_id=None,  # Unassigned
-    )
-    session.add_all([retailer_1, retailer_2, retailer_3, retailer_4])
+    session.add_all([retailer_1, retailer_2])
     session.commit()
 
     # 4. Retailer Users (linked to each Retailer)
@@ -213,19 +185,7 @@ def seed_data_if_empty(session: Session) -> None:
         role=Role.RETAILER,
         retailer_id=retailer_2.id,
     )
-    ret_user_3 = User(
-        phone="9826033333",
-        name="Anil Verma",
-        role=Role.RETAILER,
-        retailer_id=retailer_3.id,
-    )
-    ret_user_4 = User(
-        phone="9826044444",
-        name="Vikram Patel",
-        role=Role.RETAILER,
-        retailer_id=retailer_4.id,
-    )
-    session.add_all([ret_user_1, ret_user_2, ret_user_3, ret_user_4])
+    session.add_all([ret_user_1, ret_user_2])
     session.commit()
 
     # 5. Past Orders for each retailer
@@ -258,8 +218,8 @@ def seed_data_if_empty(session: Session) -> None:
     order_2 = Order(
         retailer_id=retailer_2.id,
         status=OrderStatus.CREDIT_HOLD,
-        source=OrderSource.SALESMAN,
-        placed_by_user_id=salesman_user.id,
+        source=OrderSource.RETAILER_APP,
+        placed_by_user_id=ret_user_2.id,
         created_at=datetime.now(timezone.utc) - timedelta(minutes=15),
         total=Decimal("9845.50"),
         version=1,
@@ -280,10 +240,10 @@ def seed_data_if_empty(session: Session) -> None:
     session.add(line_2)
 
     order_3 = Order(
-        retailer_id=retailer_3.id,
+        retailer_id=retailer_1.id,
         status=OrderStatus.PENDING,
         source=OrderSource.RETAILER_APP,
-        placed_by_user_id=ret_user_3.id,
+        placed_by_user_id=ret_user_1.id,
         created_at=datetime.now(timezone.utc) - timedelta(minutes=10),
         total=Decimal("4060.00"),
         version=1,
@@ -304,10 +264,10 @@ def seed_data_if_empty(session: Session) -> None:
     session.add(line_3)
 
     order_4 = Order(
-        retailer_id=retailer_4.id,
+        retailer_id=retailer_1.id,
         status=OrderStatus.PENDING,
         source=OrderSource.RETAILER_APP,
-        placed_by_user_id=ret_user_4.id,
+        placed_by_user_id=ret_user_1.id,
         created_at=datetime.now(timezone.utc) - timedelta(minutes=5),
         total=Decimal("1555.20"),
         version=1,
@@ -343,6 +303,11 @@ def seed_data_if_empty(session: Session) -> None:
         original_words="tea leaf 250g",
         sku_code="SKU-TE-250",
     )
-    session.add_all([alias_1, alias_2, alias_3])
+    alias_4 = Alias(
+        retailer_id=retailer_2.id,
+        original_words="glucose biscuit chota",
+        sku_code="SKU-BS-075",
+    )
+    session.add_all([alias_1, alias_2, alias_3, alias_4])
     session.commit()
 

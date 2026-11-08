@@ -17,6 +17,8 @@ import {
 import { getDefaultDateRange } from './formatters';
 import { OrderQueue } from './OrderQueue';
 import { OrderDetailPane } from './OrderDetailPane';
+import { CaptureView } from './CaptureView';
+import { ExportView } from './ExportView';
 import { OrdersIcon, CaptureIcon, ExportIcon, LogoutIcon } from './icons';
 
 export interface DeskShellProps {
@@ -39,6 +41,43 @@ export const DeskShell: React.FC<DeskShellProps> = ({
   onLogout,
 }) => {
   const t = deskTranslations[lang];
+
+  // Shell Layout Lockdown: html, body, and app root are 100dvh with overflow hidden
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const root = document.getElementById('root');
+
+    const prevHtmlH = html.style.height;
+    const prevHtmlO = html.style.overflow;
+    const prevBodyH = body.style.height;
+    const prevBodyO = body.style.overflow;
+    const prevRootH = root?.style.height;
+    const prevRootO = root?.style.overflow;
+
+    html.style.height = '100dvh';
+    html.style.overflow = 'hidden';
+    body.style.height = '100dvh';
+    body.style.overflow = 'hidden';
+    if (root) {
+      root.style.height = '100dvh';
+      root.style.overflow = 'hidden';
+    }
+
+    return () => {
+      html.style.height = prevHtmlH;
+      html.style.overflow = prevHtmlO;
+      body.style.height = prevBodyH;
+      body.style.overflow = prevBodyO;
+      if (root) {
+        root.style.height = prevRootH || '';
+        root.style.overflow = prevRootO || '';
+      }
+    };
+  }, []);
+
+  // Navigation State
+  const [activeNav, setActiveNav] = useState<'orders' | 'capture' | 'export'>('orders');
 
   // Filters State
   const defaultDates = useRef(getDefaultDateRange());
@@ -309,12 +348,12 @@ export const DeskShell: React.FC<DeskShellProps> = ({
   }, [orders, selectedOrderId, activeOrder, loadOrderDetail]);
 
   return (
-    <div className="min-w-[1280px] w-full min-h-screen bg-white text-ink flex flex-row">
-      {/* Sidebar: Fixed 200px Width */}
-      <aside className="w-[200px] shrink-0 min-h-screen bg-white border-r border-border flex flex-col justify-between z-30 select-none">
+    <div className="w-full h-dvh max-h-dvh overflow-hidden bg-white text-ink flex flex-row min-h-0">
+      {/* Sidebar: Fixed 200px Width, 40px nav items */}
+      <aside className="w-[200px] shrink-0 h-full bg-white border-r border-border flex flex-col justify-between z-30 select-none overflow-hidden min-h-0">
         <div className="flex flex-col">
-          {/* Header Branding */}
-          <div className="h-14 px-4 border-b border-border flex flex-col justify-center">
+          {/* Header Branding (about 56px) */}
+          <div className="h-14 shrink-0 px-4 border-b border-border flex flex-col justify-center">
             <span className="text-[18px] font-bold text-ink leading-tight">
               {t.company_name}
             </span>
@@ -323,40 +362,60 @@ export const DeskShell: React.FC<DeskShellProps> = ({
             </span>
           </div>
 
-          {/* Navigation Items */}
+          {/* Navigation Items (40px tall each) */}
           <nav className="flex flex-col py-2">
             <button
               type="button"
-              className="h-12 flex items-center px-4 transition-colors border-l-4 border-primary text-primary font-semibold bg-primary-50 text-[14px]"
+              onClick={() => setActiveNav('orders')}
+              className={`h-10 flex items-center px-4 transition-colors border-l-4 text-[14px] ${
+                activeNav === 'orders'
+                  ? 'border-primary text-primary font-semibold bg-primary-50'
+                  : 'border-transparent text-ink-muted hover:text-ink hover:bg-gray-50'
+              }`}
             >
-              <OrdersIcon className="w-5 h-5 mr-3 text-primary" />
+              <OrdersIcon className={`w-5 h-5 mr-3 ${activeNav === 'orders' ? 'text-primary' : 'text-ink-muted'}`} />
               <span>{t.nav_orders}</span>
             </button>
             <button
               type="button"
-              className="h-12 flex items-center px-4 text-ink-muted hover:text-ink hover:bg-gray-50 transition-colors border-l-4 border-transparent text-[14px]"
+              onClick={() => setActiveNav('capture')}
+              className={`h-10 flex items-center px-4 transition-colors border-l-4 text-[14px] ${
+                activeNav === 'capture'
+                  ? 'border-primary text-primary font-semibold bg-primary-50'
+                  : 'border-transparent text-ink-muted hover:text-ink hover:bg-gray-50'
+              }`}
             >
-              <CaptureIcon className="w-5 h-5 mr-3 text-ink-muted" />
+              <CaptureIcon className={`w-5 h-5 mr-3 ${activeNav === 'capture' ? 'text-primary' : 'text-ink-muted'}`} />
               <span>{t.nav_capture}</span>
             </button>
             <button
               type="button"
-              className="h-12 flex items-center px-4 text-ink-muted hover:text-ink hover:bg-gray-50 transition-colors border-l-4 border-transparent text-[14px]"
+              onClick={() => setActiveNav('export')}
+              className={`h-10 flex items-center px-4 transition-colors border-l-4 text-[14px] ${
+                activeNav === 'export'
+                  ? 'border-primary text-primary font-semibold bg-primary-50'
+                  : 'border-transparent text-ink-muted hover:text-ink hover:bg-gray-50'
+              }`}
             >
-              <ExportIcon className="w-5 h-5 mr-3 text-ink-muted" />
+              <ExportIcon className={`w-5 h-5 mr-3 ${activeNav === 'export' ? 'text-primary' : 'text-ink-muted'}`} />
               <span>{t.nav_export}</span>
             </button>
           </nav>
         </div>
 
-        {/* Bottom Sidebar: Language Toggle & Logout */}
-        <div className="p-4 border-t border-border flex flex-col gap-3">
+        {/* Bottom Sidebar: Staff Name, Language Toggle & Logout */}
+        <div className="p-3 border-t border-border flex flex-col gap-2.5 shrink-0">
+          {/* Staff name as plain text */}
+          <div className="text-[14px] font-medium text-ink truncate px-1">
+            {user.name}
+          </div>
+
           {/* Language Toggle: EN | हिं */}
-          <div className="flex items-center border border-border rounded p-1 bg-gray-50">
+          <div className="flex items-center border border-border rounded p-0.5 bg-gray-50">
             <button
               type="button"
               onClick={lang === 'en' ? undefined : onToggleLang}
-              className={`flex-1 h-8 rounded text-[13px] font-semibold flex items-center justify-center transition-colors ${
+              className={`flex-1 h-7 rounded text-[13px] font-semibold flex items-center justify-center transition-colors ${
                 lang === 'en'
                   ? 'bg-primary text-white'
                   : 'text-ink-muted hover:text-ink'
@@ -367,7 +426,7 @@ export const DeskShell: React.FC<DeskShellProps> = ({
             <button
               type="button"
               onClick={lang === 'hi' ? undefined : onToggleLang}
-              className={`flex-1 h-8 rounded text-[13px] font-semibold flex items-center justify-center transition-colors ${
+              className={`flex-1 h-7 rounded text-[13px] font-semibold flex items-center justify-center transition-colors ${
                 lang === 'hi'
                   ? 'bg-primary text-white'
                   : 'text-ink-muted hover:text-ink'
@@ -377,7 +436,7 @@ export const DeskShell: React.FC<DeskShellProps> = ({
             </button>
           </div>
 
-          {/* Logout Button */}
+          {/* Logout Button (40px tall) */}
           <button
             type="button"
             onClick={onLogout}
@@ -389,69 +448,75 @@ export const DeskShell: React.FC<DeskShellProps> = ({
         </div>
       </aside>
 
-      {/* Main Body (Top bar + Split view) */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Top Bar: Only staff name from GET /me, plain text, no avatar button */}
-        <header className="h-14 border-b border-border bg-white flex items-center justify-end px-6 shrink-0 z-20">
-          <span className="text-[14px] font-medium text-ink">
-            {user.name}
-          </span>
-        </header>
+      {/* Main Body Area: Flex row, no top bar, full height */}
+      <main className="flex-1 flex flex-row min-w-0 h-full min-h-0 overflow-hidden">
+        {activeNav === 'orders' ? (
+          <>
+            <OrderQueue
+              lang={lang}
+              orders={orders}
+              counts={counts}
+              total={totalOrders}
+              loading={queueLoading}
+              error={queueError}
+              onRetry={loadOrders}
+              selectedOrderId={selectedOrderId}
+              onSelectOrder={(id) => setSelectedOrderId(id)}
+              searchQuery={searchQuery}
+              onSearchChange={(q) => {
+                setSearchQuery(q);
+                setPageOffset(0);
+              }}
+              fromDate={fromDate}
+              onFromDateChange={(d) => {
+                setFromDate(d);
+                setPageOffset(0);
+              }}
+              toDate={toDate}
+              onToDateChange={(d) => {
+                setToDate(d);
+                setPageOffset(0);
+              }}
+              statusTab={statusTab}
+              onStatusTabChange={(s) => {
+                setStatusTab(s);
+                setPageOffset(0);
+              }}
+              pageOffset={pageOffset}
+              pageSize={pageSize}
+              onPageChange={(offset) => setPageOffset(offset)}
+            />
 
-        {/* Split View: Left 60% Queue, Right 40% Detail */}
-        <div className="flex-1 flex flex-row items-stretch">
-          <OrderQueue
+            <OrderDetailPane
+              lang={lang}
+              order={activeOrder}
+              catalogue={catalogue}
+              loading={detailLoading}
+              error={detailError}
+              onRetry={() => selectedOrderId && loadOrderDetail(selectedOrderId)}
+              onSaveEdits={handleSaveEdits}
+              onApprove={handleApproveOrder}
+              onReloadOrder={handleReloadOrder}
+              isConflict={isConflict}
+              actionError={actionError}
+              actionLoading={actionLoading}
+              overrideInputRef={overrideInputRef}
+            />
+          </>
+        ) : activeNav === 'capture' ? (
+          <CaptureView
+            token={token}
             lang={lang}
-            orders={orders}
-            counts={counts}
-            total={totalOrders}
-            loading={queueLoading}
-            error={queueError}
-            onRetry={loadOrders}
-            selectedOrderId={selectedOrderId}
-            onSelectOrder={(id) => setSelectedOrderId(id)}
-            searchQuery={searchQuery}
-            onSearchChange={(q) => {
-              setSearchQuery(q);
-              setPageOffset(0);
+            onOrderCreated={(newId) => {
+              loadOrders();
+              setSelectedOrderId(newId);
+              setActiveNav('orders');
             }}
-            fromDate={fromDate}
-            onFromDateChange={(d) => {
-              setFromDate(d);
-              setPageOffset(0);
-            }}
-            toDate={toDate}
-            onToDateChange={(d) => {
-              setToDate(d);
-              setPageOffset(0);
-            }}
-            statusTab={statusTab}
-            onStatusTabChange={(s) => {
-              setStatusTab(s);
-              setPageOffset(0);
-            }}
-            pageOffset={pageOffset}
-            pageSize={pageSize}
-            onPageChange={(offset) => setPageOffset(offset)}
           />
-
-          <OrderDetailPane
-            lang={lang}
-            order={activeOrder}
-            catalogue={catalogue}
-            loading={detailLoading}
-            error={detailError}
-            onRetry={() => selectedOrderId && loadOrderDetail(selectedOrderId)}
-            onSaveEdits={handleSaveEdits}
-            onApprove={handleApproveOrder}
-            onReloadOrder={handleReloadOrder}
-            isConflict={isConflict}
-            actionError={actionError}
-            actionLoading={actionLoading}
-            overrideInputRef={overrideInputRef}
-          />
-        </div>
-      </div>
+        ) : (
+          <ExportView token={token} lang={lang} />
+        )}
+      </main>
     </div>
   );
 };

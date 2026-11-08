@@ -5,7 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import select
 
-from backend.app.models import SKU, Retailer, Order, OrderStatus, OrderSource, Role
+from backend.app.models import SKU, Retailer, Order, OrderStatus, OrderSource, Role, User
 
 
 def login_as(client: TestClient, phone: str, otp: str = "123456") -> str:
@@ -374,8 +374,9 @@ class TestOrdersLifecycle:
         token = login_as(client, phone="9826011111")  # Retailer 1 (Gupta)
         headers = {"Authorization": f"Bearer {token}"}
 
-        # Retailer 1 already has 1 seeded order (id=1)
-        # Create 3 more orders to have a total of 4 orders
+        initial_orders = client.get("/orders/mine", headers=headers).json()
+        initial_count = len(initial_orders)
+
         res2 = client.post(
             "/orders",
             json={
@@ -412,9 +413,9 @@ class TestOrdersLifecycle:
         assert res4.status_code == 200
         order_4_id = res4.json()["id"]
 
-        # Without limit -> returns all 4 orders
+        # Without limit -> returns all orders
         all_orders = client.get("/orders/mine", headers=headers).json()
-        assert len(all_orders) == 4
+        assert len(all_orders) == initial_count + 3
 
         # With limit=3 -> returns at most 3 orders, newest first
         res_limit3 = client.get("/orders/mine?limit=3", headers=headers)
@@ -574,7 +575,7 @@ class TestDeskEndpointsAndPermissions:
         assert order["placed_by"] == "Ramesh Gupta"
         assert order["override_flag"] is False
         assert order["override_reason"] is None
-        assert order["approved_by"] == "Desk Officer Priya"
+        assert order["approved_by"] == "Desk Officer"
         assert order["approved_at"] is not None
         assert order["version"] == 1
         assert "credit_position" in order
@@ -590,8 +591,13 @@ class TestDeskEndpointsAndPermissions:
         assert line["line_total"] == "7776.00"
         assert "original_words" in line
 
-    def test_desk_catalogue_desk_and_owner_only(self, client: TestClient):
+    def test_desk_catalogue_desk_and_owner_only(self, client: TestClient, session):
         """GET /desk/catalogue returns exact stock_cases for desk and owner only."""
+        # Create test owner user
+        owner_user = User(phone="9826000003", name="Owner Rajesh Agarwal", role=Role.OWNER)
+        session.add(owner_user)
+        session.commit()
+
         desk_token = login_as(client, phone="9826000001")
         headers_desk = {"Authorization": f"Bearer {desk_token}"}
 
@@ -656,7 +662,7 @@ class TestDeskEndpointsAndPermissions:
         approved_data = approve_res.json()
         assert approved_data["status"] == "approved"
         assert approved_data["version"] == 2
-        assert approved_data["approved_by"] == "Desk Officer Priya"
+        assert approved_data["approved_by"] == "Desk Officer"
         assert approved_data["approved_at"] is not None
 
         # 3. Approving twice returns 409
@@ -724,15 +730,19 @@ class TestDeskEndpointsAndPermissions:
         assert len(retailers) == 1
         assert retailers[0]["name"] == "Gupta Kirana Store"
 
-    def test_get_me_for_staff(self, client: TestClient):
+    def test_get_me_for_staff(self, client: TestClient, session):
         """GET /me for staff returns name and role."""
+        owner_user = User(phone="9826000003", name="Owner Rajesh Agarwal", role=Role.OWNER)
+        session.add(owner_user)
+        session.commit()
+
         desk_token = login_as(client, phone="9826000001")
         headers = {"Authorization": f"Bearer {desk_token}"}
 
         res = client.get("/me", headers=headers)
         assert res.status_code == 200
         me = res.json()
-        assert me["name"] == "Desk Officer Priya"
+        assert me["name"] == "Desk Officer"
         assert me["role"] == "order_desk"
 
         # Owner
@@ -840,15 +850,21 @@ class TestDeskEndpointsAndPermissions:
         sku_approved = session.exec(select(SKU).where(SKU.code == "SKU-BS-075")).first()
         assert sku_approved.stock_cases == stock_initial - 11
 
-    def test_get_retailers_desk_and_owner_only(self, client: TestClient):
+    def test_get_retailers_desk_and_owner_only(self, client: TestClient, session):
         """GET /retailers returns id and name for all retailers, restricted to desk and owner."""
+        # Create test owner and salesman
+        owner_user = User(phone="9826000003", name="Owner Rajesh Agarwal", role=Role.OWNER)
+        sm_user = User(phone="9826000002", name="Salesman Rahul Verma", role=Role.SALESMAN)
+        session.add_all([owner_user, sm_user])
+        session.commit()
+
         desk_token = login_as(client, phone="9826000001")
         headers_desk = {"Authorization": f"Bearer {desk_token}"}
 
         res = client.get("/retailers", headers=headers_desk)
         assert res.status_code == 200
         retailers = res.json()
-        assert len(retailers) >= 4
+        assert len(retailers) >= 2
         for r in retailers:
             assert "id" in r
             assert "name" in r

@@ -138,3 +138,71 @@ export async function patchDeskOrder(
   return res.json();
 }
 
+export interface SimpleRetailer {
+  id: number;
+  name: string;
+  phone_number: string;
+}
+
+export async function fetchDeskRetailers(token: string, q?: string): Promise<SimpleRetailer[]> {
+  const url = q ? `/retailers?q=${encodeURIComponent(q)}` : '/retailers';
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  if (!res.ok) {
+    throw new DeskApiError(res.status, 'Failed to fetch retailers');
+  }
+  return res.json();
+}
+
+export async function captureDeskOrder(
+  token: string,
+  retailerId: number,
+  text: string
+): Promise<any> {
+  const res = await fetch('/capture', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      retailer_id: retailerId,
+      text,
+      source: 'desk_capture',
+    }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new DeskApiError(res.status, errorData.detail || errorData);
+  }
+  return res.json();
+}
+
+export async function postDeskOrder(
+  token: string,
+  retailerId: number,
+  lines: Array<{ sku_code: string; qty_cases: number; original_words?: string | null }>
+): Promise<any> {
+  const res = await fetch('/orders', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      retailer_id: retailerId,
+      lines,
+      source: 'desk_capture',
+      client_request_id: `desk-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new DeskApiError(res.status, errorData.detail || errorData);
+  }
+  return res.json();
+}
+

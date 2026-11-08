@@ -69,6 +69,22 @@ export interface DeskTranslations {
   btn_reload: string;
   approved_by_info: string;
   override_reason_note: string;
+  title_capture: string;
+  select_retailer: string;
+  capture_input_placeholder: string;
+  btn_parse: string;
+  btn_confirm_order: string;
+  col_confidence: string;
+  capture_empty: string;
+  parsing: string;
+  confirming: string;
+  title_export: string;
+  export_format: string;
+  include_exported: string;
+  btn_download: string;
+  no_export_orders: string;
+  export_summary: string;
+  order_confirmed_msg: string;
 }
 
 export const deskTranslations: Record<DeskLanguage, DeskTranslations> = {
@@ -131,16 +147,32 @@ export const deskTranslations: Record<DeskLanguage, DeskTranslations> = {
     over_limit_by: 'Over limit by {amount}',
     within_limit: 'Within limit ({amount} available)',
     override_reason_label: 'Override reason (required)',
-    override_placeholder: 'Enter supervisor note or approval rationale...',
+    override_placeholder: 'Override reason (required for credit hold)',
     btn_save_edits: 'Save edits',
     btn_approve: 'Approve',
-    btn_approve_override: 'Approve with override',
+    btn_approve_override: 'Override & approve',
     saving: 'Saving...',
     approving: 'Approving...',
     conflict_error: 'This order was changed by someone else. Reload it.',
     btn_reload: 'Reload',
     approved_by_info: 'Approved by {name}, {time}',
     override_reason_note: 'Override note: {reason}',
+    title_capture: 'Vernacular AI Order Capture',
+    select_retailer: 'Select retailer',
+    capture_input_placeholder: 'Type or paste order message (e.g. 5 biscuit, 2 oil...)',
+    btn_parse: 'Parse',
+    btn_confirm_order: 'Confirm order',
+    col_confidence: 'Confidence',
+    capture_empty: 'Enter an order message and click Parse to review lines',
+    parsing: 'Parsing...',
+    confirming: 'Confirming...',
+    title_export: 'Tally Export',
+    export_format: 'Format',
+    include_exported: 'Include exported',
+    btn_download: 'Download',
+    no_export_orders: 'No approved orders found to export',
+    export_summary: '{count} orders ready for Tally export',
+    order_confirmed_msg: 'Order #{id} created successfully',
   },
   hi: {
     company_name: 'Company A',
@@ -201,16 +233,32 @@ export const deskTranslations: Record<DeskLanguage, DeskTranslations> = {
     over_limit_by: 'सीमा से {amount} अधिक',
     within_limit: 'सीमा के भीतर ({amount} उपलब्ध)',
     override_reason_label: 'ओवरराइड कारण (आवश्यक)',
-    override_placeholder: 'पर्यवेक्षक नोट या अनुमोदन कारण दर्ज करें...',
-    btn_save_edits: 'संपादन सहेजें',
+    override_placeholder: 'ओवरराइड कारण (क्रेडिट होल्ड के लिए आवश्यक)',
+    btn_save_edits: 'बदलाव सेव करें',
     btn_approve: 'स्वीकृत करें',
-    btn_approve_override: 'ओवरराइड के साथ स्वीकृत करें',
+    btn_approve_override: 'ओवरराइड और स्वीकृत',
     saving: 'सहेज रहे हैं...',
     approving: 'स्वीकृत कर रहे हैं...',
     conflict_error: 'यह ऑर्डर किसी और द्वारा बदल दिया गया था। इसे पुनः लोड करें।',
     btn_reload: 'पुनः लोड करें',
     approved_by_info: '{name} द्वारा स्वीकृत, {time}',
     override_reason_note: 'ओवरराइड नोट: {reason}',
+    title_capture: 'AI ऑर्डर कैप्चर',
+    select_retailer: 'किराना चुनें',
+    capture_input_placeholder: 'ऑर्डर संदेश दर्ज करें (उदा. 5 बिस्किट, 2 तेल...)',
+    btn_parse: 'पार्स करें',
+    btn_confirm_order: 'ऑर्डर पुष्टि करें',
+    col_confidence: 'सटीकता',
+    capture_empty: 'पंक्तियों की समीक्षा के लिए संदेश दर्ज करें और पार्स पर क्लिक करें',
+    parsing: 'पार्स कर रहे हैं...',
+    confirming: 'पुष्टि कर रहे हैं...',
+    title_export: 'टैली एक्सपोर्ट',
+    export_format: 'प्रारूप',
+    include_exported: 'पहले से एक्सपोर्ट किए गए शामिल करें',
+    btn_download: 'डाउनलोड करें',
+    no_export_orders: 'एक्सपोर्ट के लिए कोई स्वीकृत ऑर्डर नहीं मिला',
+    export_summary: 'टैली एक्सपोर्ट के लिए {count} ऑर्डर तैयार हैं',
+    order_confirmed_msg: 'ऑर्डर #{id} सफलतापूर्वक बनाया गया',
   },
 };
 

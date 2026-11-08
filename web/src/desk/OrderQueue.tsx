@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { DeskLanguage } from './i18n';
 import { deskTranslations } from './i18n';
 import type { DeskOrderSummary, DeskOrdersCounts, OrderStatus } from './types';
@@ -68,6 +68,15 @@ export const OrderQueue: React.FC<OrderQueueProps> = ({
     return () => clearTimeout(timer);
   }, [localSearch, searchQuery, onSearchChange]);
 
+  // Ref to scroll selected row into view
+  const selectedRowRef = useRef<HTMLTableRowElement | null>(null);
+
+  useEffect(() => {
+    if (selectedRowRef.current) {
+      selectedRowRef.current.scrollIntoView({ block: 'nearest' });
+    }
+  }, [selectedOrderId]);
+
   const tabs: Array<{ id: string; label: string; count: number }> = [
     { id: 'all', label: t.tab_all, count: counts.all },
     { id: 'pending', label: t.tab_pending, count: counts.pending },
@@ -116,12 +125,13 @@ export const OrderQueue: React.FC<OrderQueueProps> = ({
     .replace('{total}', String(total));
 
   return (
-    <div className="w-[60%] flex flex-col p-5 border-r border-border bg-white min-h-[calc(100vh-56px)] select-none">
-      {/* Top Filter and Keyboard Shortcuts */}
-      <div className="flex flex-col gap-2.5 pb-3">
-        <div className="flex items-center gap-3">
+    <div className="w-[60%] shrink-0 h-full min-h-0 flex flex-col p-4 border-r border-border bg-white select-none overflow-hidden">
+      {/* Compact Toolbar in 2 rows at most */}
+      <div className="flex flex-col gap-2 shrink-0 mb-2">
+        {/* Row 1: Search, From, To (36px tall fields, 13px labels, lang="en-IN" for DD/MM/YYYY) */}
+        <div className="flex items-center gap-2 w-full">
           {/* Retailer Search Box */}
-          <div className="relative flex-1">
+          <div className="relative flex-1 min-w-0">
             <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-muted pointer-events-none">
               <SearchIcon className="w-4 h-4" />
             </span>
@@ -135,13 +145,14 @@ export const OrderQueue: React.FC<OrderQueueProps> = ({
           </div>
 
           {/* Date Range Inputs */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
             <div className="flex items-center border border-border rounded bg-white h-9 px-2">
               <span className="text-[13px] font-medium text-ink-muted mr-1.5 uppercase">
                 {t.from_date}
               </span>
               <input
                 type="date"
+                lang="en-IN"
                 value={fromDate}
                 onChange={(e) => onFromDateChange(e.target.value)}
                 className="text-[14px] text-ink bg-transparent focus:outline-none"
@@ -154,6 +165,7 @@ export const OrderQueue: React.FC<OrderQueueProps> = ({
               </span>
               <input
                 type="date"
+                lang="en-IN"
                 value={toDate}
                 onChange={(e) => onToDateChange(e.target.value)}
                 className="text-[14px] text-ink bg-transparent focus:outline-none"
@@ -162,51 +174,54 @@ export const OrderQueue: React.FC<OrderQueueProps> = ({
           </div>
         </div>
 
-        {/* Keyboard Shortcuts One-Line Guide */}
-        <div className="flex justify-end items-center text-[13px] text-ink-muted px-0.5">
-          <span className="tracking-tight">{t.keyboard_shortcuts}</span>
+        {/* Row 2: Tabs on left, shortcut hint on right, same line */}
+        <div className="flex items-center justify-between border-b border-border min-h-[32px] overflow-hidden">
+          {/* Filter Tabs */}
+          <div className="flex items-center gap-0.5 shrink-0">
+            {tabs.map((tab) => {
+              const isActive = statusTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => onStatusTabChange(tab.id)}
+                  className={`py-1 px-2 text-[13px] transition-colors border-b-2 flex items-center gap-1 shrink-0 ${
+                    isActive
+                      ? 'border-primary text-primary font-semibold -mb-[1px]'
+                      : 'border-transparent text-ink-muted hover:text-ink'
+                  }`}
+                >
+                  <span className="whitespace-nowrap">{tab.label}</span>
+                  <span
+                    className={`text-[12px] px-1 py-0.2 rounded-full ${
+                      isActive
+                        ? 'bg-primary-50 text-primary font-semibold'
+                        : 'text-ink-muted'
+                    }`}
+                  >
+                    {tab.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Shortcut hint on right, same line */}
+          <div className="text-[12px] text-ink-muted tracking-tight whitespace-nowrap pl-2 truncate shrink-0">
+            {t.keyboard_shortcuts}
+          </div>
         </div>
       </div>
 
-      {/* Status Filter Tabs with Counts */}
-      <div className="flex items-center gap-1 border-b border-border mb-3">
-        {tabs.map((tab) => {
-          const isActive = statusTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => onStatusTabChange(tab.id)}
-              className={`py-2 px-3 text-[14px] transition-colors border-b-2 flex items-center gap-1.5 ${
-                isActive
-                  ? 'border-primary text-primary font-semibold -mb-[1px]'
-                  : 'border-transparent text-ink-muted hover:text-ink'
-              }`}
-            >
-              <span>{tab.label}</span>
-              <span
-                className={`text-[13px] px-1.5 py-0.2 rounded-full ${
-                  isActive
-                    ? 'bg-primary-50 text-primary font-semibold'
-                    : 'text-ink-muted'
-                }`}
-              >
-                {tab.count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Orders Table Area */}
-      <div className="w-full flex-1 overflow-x-auto">
+      {/* Orders Table Area: Fills remaining height with vertical scroll, sticky header, 36px rows */}
+      <div className="w-full flex-1 min-h-0 overflow-y-auto">
         {loading ? (
-          <div className="flex flex-col items-center justify-center h-64 text-ink-muted text-[14px]">
+          <div className="flex flex-col items-center justify-center h-48 text-ink-muted text-[14px]">
             <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mb-3"></div>
             <span>{t.loading_orders}</span>
           </div>
         ) : error ? (
-          <div className="flex flex-col items-center justify-center h-64 text-[14px]">
+          <div className="flex flex-col items-center justify-center h-48 text-[14px]">
             <p className="text-error font-medium mb-3">{error}</p>
             <button
               type="button"
@@ -217,19 +232,19 @@ export const OrderQueue: React.FC<OrderQueueProps> = ({
             </button>
           </div>
         ) : orders.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-[14px] text-ink-muted">
+          <div className="flex flex-col items-center justify-center h-48 text-[14px] text-ink-muted">
             <p className="font-semibold text-ink text-[16px] mb-1">{t.empty_orders_title}</p>
             <p className="text-[13px]">{t.empty_orders_desc}</p>
           </div>
         ) : (
           <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="h-9 border-b border-border bg-gray-50 text-ink-muted text-[13px]">
-                <th className="px-3 font-medium">{t.col_retailer}</th>
-                <th className="px-3 font-medium text-right">{t.col_total}</th>
-                <th className="px-3 font-medium">{t.col_status}</th>
-                <th className="px-3 font-medium">{t.col_source}</th>
-                <th className="px-3 font-medium text-right">{t.col_age}</th>
+            <thead className="sticky top-0 bg-gray-50 z-10">
+              <tr className="h-9 border-b border-border text-ink-muted text-[13px]">
+                <th className="px-3 font-medium bg-gray-50">{t.col_retailer}</th>
+                <th className="px-3 font-medium text-right bg-gray-50">{t.col_total}</th>
+                <th className="px-3 font-medium bg-gray-50">{t.col_status}</th>
+                <th className="px-3 font-medium bg-gray-50">{t.col_source}</th>
+                <th className="px-3 font-medium text-right bg-gray-50">{t.col_age}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -238,6 +253,7 @@ export const OrderQueue: React.FC<OrderQueueProps> = ({
                 return (
                   <tr
                     key={order.id}
+                    ref={isSelected ? selectedRowRef : undefined}
                     onClick={() => onSelectOrder(order.id)}
                     className={`h-9 cursor-pointer transition-colors text-[14px] ${
                       isSelected
@@ -282,8 +298,8 @@ export const OrderQueue: React.FC<OrderQueueProps> = ({
         )}
       </div>
 
-      {/* Pagination Footer */}
-      <div className="flex items-center justify-between pt-4 mt-auto border-t border-border text-[13px]">
+      {/* Paging Bar: Pinned at the bottom, 40px tall */}
+      <div className="h-10 shrink-0 border-t border-border flex items-center justify-between text-[13px] pt-1 mt-auto">
         <span className="text-ink-muted tabular-nums">{paginationText}</span>
         <div className="flex items-center gap-2">
           <button
@@ -315,4 +331,3 @@ export const OrderQueue: React.FC<OrderQueueProps> = ({
     </div>
   );
 };
-
