@@ -39,6 +39,12 @@ export default {
         body: ['var(--font-size-body)', { lineHeight: 'var(--line-height-body)', fontWeight: '400' }],
         small: ['var(--font-size-small)', { lineHeight: 'var(--line-height-small)', fontWeight: '400' }],
         micro: ['var(--font-size-micro)', { lineHeight: 'var(--line-height-micro)', fontWeight: '500' }],
+
+        // Desk type tokens (16px = 1rem)
+        'desk-title': ['var(--font-size-desk-title)', { lineHeight: 'var(--line-height-desk-title)', fontWeight: '600' }],
+        'desk-body': ['var(--font-size-desk-body)', { lineHeight: 'var(--line-height-desk-body)', fontWeight: '400' }],
+        'desk-meta': ['var(--font-size-desk-meta)', { lineHeight: 'var(--line-height-desk-meta)', fontWeight: '400' }],
+        'desk-money-lg': ['var(--font-size-desk-money-lg)', { lineHeight: 'var(--line-height-desk-money-lg)', fontWeight: '700' }],
       },
       fontFamily: {
         sans: [

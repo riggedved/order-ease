@@ -542,3 +542,151 @@ class TestCaptureEndpointAndLifecycle:
         assert detail["sku_code"] == "SKU-BS-075"
         assert detail["available"] == 340
 
+
+class TestCategoryCompatibilityAndLLMGuard:
+    """Tests ensuring cross-category mismatches are rejected and LLM keyword guard works."""
+
+    def test_sample_message_literal_values_under_rule_parser_with_corrupted_alias(self, session):
+        """Even if a poisoned cross-category alias exists (e.g. '2 peti washing powder 1 kilo' -> 'SKU-TE-100'),
+        RuleBasedParser rejects it:
+        - Line 1: SKU-BS-075 x5
+        - Line 2: SKU-DT-1KG x2
+        - Line 3: SKU-TE-250 x1 (out_of_stock)
+        """
+        # Inject corrupted alias for retailer 1
+        poisoned_alias = Alias(
+            retailer_id=1,
+            original_words="2 peti washing powder 1 kilo",
+            sku_code="SKU-TE-100",
+        )
+        session.add(poisoned_alias)
+        session.commit()
+
+        parser = RuleBasedParser()
+        sample_text = "bhaiya 5 peti biscuit chhota, 2 peti washing powder 1 kilo, chai patti 250 wala 1 peti"
+        res = parser.parse(sample_text, retailer_id=1, session=session)
+
+        assert len(res.lines) == 3
+        # Line 1: SKU-BS-075 x5
+        assert res.lines[0].sku_code == "SKU-BS-075"
+        assert res.lines[0].qty == 5
+        assert res.lines[0].unit == "case"
+
+        # Line 2: SKU-DT-1KG x2 (poisoned alias SKU-TE-100 must be rejected!)
+        assert res.lines[1].sku_code == "SKU-DT-1KG"
+        assert res.lines[1].qty == 2
+        assert res.lines[1].unit == "case"
+
+        # Line 3: SKU-TE-250 x1 out_of_stock
+        assert res.lines[2].sku_code == "SKU-TE-250"
+        assert res.lines[2].qty == 1
+        assert res.lines[2].unit == "case"
+        assert "out_of_stock" in res.lines[2].flags
+
+    def test_sample_message_literal_values_under_llm_parser_with_corrupted_alias(self, session, monkeypatch):
+        """Sample message gives SKU-BS-075 x5, SKU-DT-1KG x2, SKU-TE-250 x1 out_of_stock under LLMParser
+        (mocking the LLM), even when poisoned alias exists in DB.
+        """
+        poisoned_alias = Alias(
+            retailer_id=1,
+            original_words="2 peti washing powder 1 kilo",
+            sku_code="SKU-TE-100",
+        )
+        session.add(poisoned_alias)
+        session.commit()
+
+        llm_json = json.dumps({
+            "lines": [
+                {
+                    "original_words": "bhaiya 5 peti biscuit chhota",
+                    "qty": 5,
+                    "unit": "case",
+                    "item_text": "biscuit chhota",
+                },
+                {
+                    "original_words": "2 peti washing powder 1 kilo",
+                    "qty": 2,
+                    "unit": "case",
+                    "item_text": "washing powder 1 kilo",
+                },
+                {
+                    "original_words": "chai patti 250 wala 1 peti",
+                    "qty": 1,
+                    "unit": "case",
+                    "item_text": "chai patti 250 wala",
+                },
+            ]
+        })
+        monkeypatch.setattr(httpx.Client, "post", make_llm_mock(llm_json))
+
+        parser = LLMParser()
+        sample_text = "bhaiya 5 peti biscuit chhota, 2 peti washing powder 1 kilo, chai patti 250 wala 1 peti"
+        res = parser.parse(sample_text, retailer_id=1, session=session)
+
+        assert len(res.lines) == 3
+        # Line 1: SKU-BS-075 x5
+        assert res.lines[0].sku_code == "SKU-BS-075"
+        assert res.lines[0].qty == 5
+        assert res.lines[0].unit == "case"
+
+        # Line 2: SKU-DT-1KG x2
+        assert res.lines[1].sku_code == "SKU-DT-1KG"
+        assert res.lines[1].qty == 2
+        assert res.lines[1].unit == "case"
+
+        # Line 3: SKU-TE-250 x1 out_of_stock
+        assert res.lines[2].sku_code == "SKU-TE-250"
+        assert res.lines[2].qty == 1
+        assert res.lines[2].unit == "case"
+        assert "out_of_stock" in res.lines[2].flags
+
+    def test_matched_sku_never_has_different_category_than_item_words(self, session):
+        """Enforces that detergent words can never match tea, and tea words can never match biscuit."""
+        parser = RuleBasedParser()
+
+        # Category compatibility helper tests
+        assert parser.is_category_compatible("washing powder 1 kilo", "SKU-DT-1KG") is True
+        assert parser.is_category_compatible("surf excel 500g", "SKU-DT-500") is True
+        assert parser.is_category_compatible("washing powder 1 kilo", "SKU-TE-100") is False
+        assert parser.is_category_compatible("detergent powder", "SKU-BS-075") is False
+        assert parser.is_category_compatible("chai patti 250 wala", "SKU-DT-1KG") is False
+        assert parser.is_category_compatible("biscuit chhota", "SKU-TE-250") is False
+
+        # Add cross-category aliases
+        session.add(Alias(retailer_id=2, original_words="surf", sku_code="SKU-TE-100"))
+        session.add(Alias(retailer_id=2, original_words="chai patti", sku_code="SKU-BS-075"))
+        session.commit()
+
+        # Matching 'surf' must NOT return SKU-TE-100
+        res1 = parser.parse("2 peti surf", retailer_id=2, session=session)
+        assert res1.lines[0].sku_code == "SKU-DT-1KG"  # Default detergent SKU, not tea
+
+        # Matching 'chai patti' must NOT return SKU-BS-075
+        res2 = parser.parse("1 peti chai patti", retailer_id=2, session=session)
+        assert res2.lines[0].sku_code == "SKU-TE-250"  # Default tea SKU, not biscuit
+
+    def test_llm_guard_downgrades_to_low_when_item_text_shares_no_keyword_or_alias(self, session, monkeypatch):
+        """If the LLM's item_text and the matched SKU share no keyword or alias,
+        downgrade the line to Low confidence and list alternatives.
+        """
+        # LLM extracted an item_text that has no keyword or alias in common with biscuits ("agarbatti dhoop")
+        llm_json = json.dumps({
+            "lines": [
+                {
+                    "original_words": "5 peti biscuit chhota",
+                    "qty": 5,
+                    "unit": "case",
+                    "item_text": "agarbatti dhoop",
+                }
+            ]
+        })
+        monkeypatch.setattr(httpx.Client, "post", make_llm_mock(llm_json))
+
+        parser = LLMParser()
+        res = parser.parse("5 peti biscuit chhota", retailer_id=1, session=session)
+        assert len(res.lines) == 1
+        line = res.lines[0]
+        # Guard triggered: confidence downgraded to low and alternatives listed
+        assert line.confidence == "low"
+        assert len(line.alternatives) > 0
+

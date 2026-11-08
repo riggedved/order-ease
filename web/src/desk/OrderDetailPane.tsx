@@ -74,7 +74,7 @@ export const OrderDetailPane: React.FC<OrderDetailPaneProps> = ({
 
   if (loading) {
     return (
-      <div className="w-[40%] flex-1 h-full min-h-0 flex flex-col items-center justify-center p-4 bg-white text-ink-muted text-[14px]">
+      <div className="w-[40%] flex-1 h-full min-h-0 flex flex-col items-center justify-center p-4 bg-white text-ink-muted desk-body">
         <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mb-3"></div>
         <span>{t.loading_details}</span>
       </div>
@@ -83,12 +83,12 @@ export const OrderDetailPane: React.FC<OrderDetailPaneProps> = ({
 
   if (error) {
     return (
-      <div className="w-[40%] flex-1 h-full min-h-0 flex flex-col items-center justify-center p-4 bg-white text-[14px]">
+      <div className="w-[40%] flex-1 h-full min-h-0 flex flex-col items-center justify-center p-4 bg-white desk-body">
         <p className="text-error font-medium mb-3">{error}</p>
         <button
           type="button"
           onClick={onRetry}
-          className="px-4 py-1.5 border border-border rounded text-ink hover:bg-gray-50 text-[14px]"
+          className="px-4 py-1.5 border border-border rounded text-ink hover:bg-gray-50 desk-body font-semibold"
         >
           {t.btn_retry}
         </button>
@@ -98,7 +98,7 @@ export const OrderDetailPane: React.FC<OrderDetailPaneProps> = ({
 
   if (!order) {
     return (
-      <div className="w-[40%] flex-1 h-full min-h-0 flex flex-col items-center justify-center p-4 bg-white text-ink-muted text-[14px] text-center">
+      <div className="w-[40%] flex-1 h-full min-h-0 flex flex-col items-center justify-center p-4 bg-white text-ink-muted desk-body text-center">
         <p>{t.no_order_selected}</p>
       </div>
     );
@@ -189,26 +189,26 @@ export const OrderDetailPane: React.FC<OrderDetailPaneProps> = ({
       {/* ZONE 1: Fixed Header (~64px): Retailer name, status, and one grey line */}
       <div className="h-16 shrink-0 px-4 py-2 border-b border-border flex flex-col justify-center bg-white">
         <div className="flex items-center justify-between">
-          <h2 className="text-[18px] font-bold text-ink leading-tight truncate">
+          <h2 className="desk-title text-ink leading-tight truncate">
             {order.retailer_name}
           </h2>
           <div className="text-right shrink-0 ml-2">
             {order.status === 'credit_hold' ? (
-              <span className="text-[14px] font-semibold text-error">
+              <span className="desk-body font-semibold text-error">
                 {t.status_credit_hold}
               </span>
             ) : order.status === 'approved' ? (
-              <span className="text-[14px] font-semibold text-primary">
+              <span className="desk-body font-semibold text-primary">
                 {t.status_approved}
               </span>
             ) : (
-              <span className="text-[14px] text-ink-muted">
+              <span className="desk-body text-ink-muted">
                 {t.status_pending}
               </span>
             )}
           </div>
         </div>
-        <p className="text-[13px] text-ink-muted truncate mt-0.5">
+        <p className="desk-meta text-ink-muted truncate mt-0.5">
           {t.order_number.replace('{id}', String(order.id))} · {getSourceLabel(order.source)} · {formatDateTime(order.created_at)}
         </p>
       </div>
@@ -219,14 +219,14 @@ export const OrderDetailPane: React.FC<OrderDetailPaneProps> = ({
         <div className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-3">
           {/* Lines Table without 'ORDER ITEMS' label */}
           <div className="w-full">
-            <table className="w-full text-left border-collapse text-[14px]">
+            <table className="w-full text-left border-collapse desk-body">
               <thead>
-                <tr className="h-8 border-b border-border text-[13px] text-ink-muted">
-                  <th className="font-medium pb-1">{t.col_product}</th>
-                  <th className="font-medium pb-1 text-center w-12">{t.col_cases}</th>
-                  <th className="font-medium pb-1 text-center w-10">{t.col_free}</th>
-                  <th className="font-medium pb-1 text-right w-14">{t.col_stock}</th>
-                  <th className="font-medium pb-1 text-right w-20">{t.col_line_total}</th>
+                <tr className="h-8 border-b border-border desk-meta font-semibold text-ink-muted">
+                  <th className="font-semibold pb-1">{t.col_product}</th>
+                  <th className="font-semibold pb-1 text-right tabular-nums w-14">{t.col_cases}</th>
+                  <th className="font-semibold pb-1 text-right tabular-nums w-12">{t.col_free}</th>
+                  <th className="font-semibold pb-1 text-right tabular-nums w-14">{t.col_stock}</th>
+                  <th className="font-semibold pb-1 text-right tabular-nums w-20">{t.col_line_total}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -237,12 +237,12 @@ export const OrderDetailPane: React.FC<OrderDetailPaneProps> = ({
                   const isShort = needed > stock;
 
                   return (
-                    <tr key={line.line_id || idx} className="h-10 py-1">
+                    <tr key={line.line_id || idx} className="h-10 py-1 desk-body">
                       {/* Product Dropdown (with title tooltip) or Read-only Label */}
                       <td className="py-1.5 pr-2 align-middle">
                         {isApproved ? (
                           <div
-                            className="font-medium text-ink truncate"
+                            className="font-medium text-ink truncate desk-body"
                             title={catSku?.name || line.sku_code}
                           >
                             {catSku?.name || line.sku_code}
@@ -252,7 +252,7 @@ export const OrderDetailPane: React.FC<OrderDetailPaneProps> = ({
                             value={line.sku_code}
                             title={catSku?.name || line.sku_code}
                             onChange={(e) => handleSkuChange(idx, e.target.value)}
-                            className="w-full h-8 px-2 text-[14px] border border-border rounded bg-white text-ink focus:outline-none focus:border-primary truncate"
+                            className="w-full h-8 px-2 desk-body border border-border rounded bg-white text-ink focus:outline-none focus:border-primary truncate"
                           >
                             {catalogue.map((s) => (
                               <option key={s.sku_code} value={s.sku_code} title={s.name}>
@@ -263,28 +263,28 @@ export const OrderDetailPane: React.FC<OrderDetailPaneProps> = ({
                         )}
                       </td>
 
-                      {/* Cases Input / Text */}
-                      <td className="py-1.5 px-1 text-center align-middle">
+                      {/* Cases Input / Text (right-aligned, tabular-nums) */}
+                      <td className="py-1.5 px-1 text-right align-middle">
                         {isApproved ? (
-                          <span className="text-ink">{line.qty_cases}</span>
+                          <span className="text-ink tabular-nums">{line.qty_cases}</span>
                         ) : (
                           <input
                             type="number"
                             min="0"
                             value={line.qty_cases}
                             onChange={(e) => handleQtyChange(idx, parseInt(e.target.value, 10) || 0)}
-                            className="w-12 h-8 text-center border border-border rounded text-[14px] text-ink focus:outline-none focus:border-primary"
+                            className="w-14 h-8 text-right px-1.5 border border-border rounded desk-body text-ink focus:outline-none focus:border-primary tabular-nums"
                           />
                         )}
                       </td>
 
-                      {/* Free (Read-only Text) */}
-                      <td className="py-1.5 px-1 text-center align-middle text-ink-muted text-[14px]">
+                      {/* Free (Read-only Text, right-aligned, tabular-nums) */}
+                      <td className="py-1.5 px-1 text-right align-middle text-ink-muted tabular-nums">
                         {line.free_cases || 0}
                       </td>
 
-                      {/* Stock from Catalogue */}
-                      <td className="py-1.5 px-1 text-right align-middle text-[14px] tabular-nums">
+                      {/* Stock from Catalogue (right-aligned, tabular-nums) */}
+                      <td className="py-1.5 px-1 text-right align-middle tabular-nums">
                         {isShort ? (
                           <span className="text-error font-medium">
                             {stock} ({t.stock_short})
@@ -294,8 +294,8 @@ export const OrderDetailPane: React.FC<OrderDetailPaneProps> = ({
                         )}
                       </td>
 
-                      {/* Line Total */}
-                      <td className="py-1.5 pl-2 text-right align-middle font-semibold text-ink text-[14px] tabular-nums">
+                      {/* Line Total (right-aligned, tabular-nums) */}
+                      <td className="py-1.5 pl-2 text-right align-middle font-semibold text-ink tabular-nums">
                         {formatINR(line.line_total)}
                       </td>
                     </tr>
@@ -306,53 +306,53 @@ export const OrderDetailPane: React.FC<OrderDetailPaneProps> = ({
           </div>
 
           {/* Totals Breakdown */}
-          <div className="flex flex-col items-end gap-1 pb-2 border-b border-border text-[14px] shrink-0">
-            <div className="flex justify-between w-48 text-ink-muted">
+          <div className="flex flex-col items-end gap-1 pb-2 border-b border-border shrink-0">
+            <div className="flex justify-between w-48 text-ink-muted desk-body">
               <span>{t.subtotal}</span>
-              <span className="tabular-nums">{formatINR(subtotal)}</span>
+              <span className="tabular-nums text-right">{formatINR(subtotal)}</span>
             </div>
-            <div className="flex justify-between w-48 text-ink-muted">
+            <div className="flex justify-between w-48 text-ink-muted desk-body">
               <span>{t.gst}</span>
-              <span className="tabular-nums">{formatINR(gst)}</span>
+              <span className="tabular-nums text-right">{formatINR(gst)}</span>
             </div>
-            <div className="flex justify-between w-48 font-bold text-ink pt-1 border-t border-border text-[16px]">
+            <div className="flex justify-between w-48 text-ink pt-1 border-t border-border desk-money-lg">
               <span>{t.total}</span>
-              <span className="tabular-nums">{formatINR(total)}</span>
+              <span className="tabular-nums text-right">{formatINR(total)}</span>
             </div>
           </div>
 
           {/* Credit Position: Compact 2x2 grid with status text on its own line under it */}
           <div className="p-3 border border-border rounded bg-white shrink-0">
-            <div className="text-[13px] font-semibold text-ink mb-2">
+            <div className="desk-meta font-semibold text-ink mb-2">
               {t.credit_position}
             </div>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[13px]">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 desk-body">
               <div className="flex justify-between">
                 <span className="text-ink-muted">{t.credit_limit}</span>
-                <span className="font-medium text-ink tabular-nums">{formatINR(cp.credit_limit, false)}</span>
+                <span className="font-medium text-ink tabular-nums text-right">{formatINR(cp.credit_limit, false)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-ink-muted">{t.credit_outstanding}</span>
-                <span className="font-medium text-ink tabular-nums">{formatINR(cp.outstanding, false)}</span>
+                <span className="font-medium text-ink tabular-nums text-right">{formatINR(cp.outstanding, false)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-ink-muted">{t.credit_this_order}</span>
-                <span className="font-medium text-ink tabular-nums">{formatINR(cp.current_order_total, false)}</span>
+                <span className="font-medium text-ink tabular-nums text-right">{formatINR(cp.current_order_total, false)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-ink-muted">{t.credit_projected}</span>
-                <span className="font-medium text-ink tabular-nums">{formatINR(cp.projected_outstanding, false)}</span>
+                <span className="font-medium text-ink tabular-nums text-right">{formatINR(cp.projected_outstanding, false)}</span>
               </div>
             </div>
 
             {/* Over limit / Within limit on its own line under 2x2 grid */}
             <div className="mt-2 pt-1.5 border-t border-border flex justify-end">
               {isOverLimit ? (
-                <span className="text-[13px] font-semibold text-error tabular-nums">
+                <span className="desk-body font-semibold text-error tabular-nums">
                   {t.over_limit_by.replace('{amount}', formatINR(overAmount, false))}
                 </span>
               ) : (
-                <span className="text-[13px] font-semibold text-primary tabular-nums">
+                <span className="desk-body font-semibold text-primary tabular-nums">
                   {t.within_limit.replace('{amount}', formatINR(availableAmount, false))}
                 </span>
               )}
@@ -363,7 +363,7 @@ export const OrderDetailPane: React.FC<OrderDetailPaneProps> = ({
         {/* Error and 409 messages appear as a single line directly above footer, inside body zone's bottom edge */}
         {isConflict && (
           <div className="px-4 py-2 border-t border-border bg-white shrink-0">
-            <div className="flex items-center justify-between px-3 py-1 bg-[#fef3c7] border border-[#fcd34d] rounded text-[#92400e] text-[13px]">
+            <div className="flex items-center justify-between px-3 py-1 bg-[#fef3c7] border border-[#fcd34d] rounded text-[#92400e] desk-meta">
               <div className="flex items-center gap-1.5 truncate mr-2">
                 <WarningIcon className="w-4 h-4 text-[#92400e] shrink-0" />
                 <span className="truncate">{t.conflict_error}</span>
@@ -371,7 +371,7 @@ export const OrderDetailPane: React.FC<OrderDetailPaneProps> = ({
               <button
                 type="button"
                 onClick={onReloadOrder}
-                className="px-2 py-0.5 text-[12px] font-semibold rounded bg-white border border-[#fcd34d] text-[#92400e] hover:bg-[#fffbeb] transition-colors shrink-0"
+                className="px-2 py-0.5 desk-body font-semibold rounded bg-white border border-[#fcd34d] text-[#92400e] hover:bg-[#fffbeb] transition-colors shrink-0"
               >
                 {t.btn_reload}
               </button>
@@ -381,7 +381,7 @@ export const OrderDetailPane: React.FC<OrderDetailPaneProps> = ({
 
         {actionError && !isConflict && (
           <div className="px-4 py-2 border-t border-border bg-white shrink-0">
-            <div className="px-3 py-1 bg-red-50 border border-red-200 rounded text-error text-[13px] truncate">
+            <div className="px-3 py-1 bg-red-50 border border-red-200 rounded text-error desk-meta truncate">
               <p className="truncate font-medium">{actionError}</p>
             </div>
           </div>
@@ -393,13 +393,13 @@ export const OrderDetailPane: React.FC<OrderDetailPaneProps> = ({
         {isApproved ? (
           /* Approved orders: footer shows only 'Approved by NAME, date' line; no reason or buttons */
           <div className="flex flex-col items-end justify-center min-h-[40px] text-right">
-            <div className="text-[13px] text-ink-muted">
+            <div className="desk-meta text-ink-muted">
               {t.approved_by_info
                 .replace('{name}', order.approved_by || 'Staff')
                 .replace('{time}', formatDateTime(order.approved_at))}
             </div>
             {order.override_reason && (
-              <div className="text-[12px] text-ink-muted mt-0.5">
+              <div className="desk-meta text-ink-muted mt-0.5">
                 {t.override_reason_note.replace('{reason}', order.override_reason)}
               </div>
             )}
@@ -415,20 +415,20 @@ export const OrderDetailPane: React.FC<OrderDetailPaneProps> = ({
               onChange={(e) => setOverrideReason(e.target.value)}
               disabled={!isCreditHold}
               placeholder={t.override_placeholder}
-              className={`h-9 px-3 text-[14px] border border-border rounded text-ink placeholder:text-ink-muted focus:outline-none focus:border-primary w-full ${
+              className={`h-9 px-3 desk-body border border-border rounded text-ink placeholder:text-ink-muted focus:outline-none focus:border-primary w-full ${
                 !isCreditHold ? 'bg-gray-50 text-ink-muted cursor-not-allowed' : 'bg-white'
               }`}
             />
 
             {/* Row of three buttons, 40px tall (h-10), sized evenly, no text wrap */}
-            <div className="flex items-center gap-2 w-full">
+            <div className="flex items-center gap-1.5 w-full">
               <button
                 type="button"
                 disabled={actionLoading}
                 onClick={handleSaveClick}
-                className={`flex-1 h-10 px-1 border border-border rounded text-[13px] font-medium transition-colors flex items-center justify-center text-center whitespace-nowrap truncate ${
+                className={`desk-body font-semibold flex-1 h-10 px-1 border border-border rounded transition-colors flex items-center justify-center text-center whitespace-nowrap truncate ${
                   actionLoading
-                    ? 'bg-gray-100 text-ink-subtle cursor-not-allowed'
+                    ? 'bg-gray-100 text-ink-muted cursor-not-allowed font-medium'
                     : 'text-ink hover:bg-gray-50'
                 }`}
               >
@@ -439,9 +439,9 @@ export const OrderDetailPane: React.FC<OrderDetailPaneProps> = ({
                 type="button"
                 disabled={actionLoading || !canApproveNormal}
                 onClick={handleApproveNormal}
-                className={`flex-1 h-10 px-1 rounded text-[13px] font-semibold transition-colors flex items-center justify-center text-center whitespace-nowrap truncate ${
+                className={`desk-body font-semibold flex-1 h-10 px-1 rounded transition-colors flex items-center justify-center text-center whitespace-nowrap truncate ${
                   actionLoading || !canApproveNormal
-                    ? 'border border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed font-medium'
+                    ? 'border border-gray-200 bg-gray-100 text-ink-muted cursor-not-allowed font-medium'
                     : 'bg-[#0c831f] text-white hover:bg-[#0a6f1a]'
                 }`}
               >
@@ -452,9 +452,9 @@ export const OrderDetailPane: React.FC<OrderDetailPaneProps> = ({
                 type="button"
                 disabled={actionLoading || !canApproveOverride}
                 onClick={handleApproveWithOverride}
-                className={`flex-1 h-10 px-1 rounded text-[13px] font-semibold transition-colors flex items-center justify-center text-center whitespace-nowrap truncate ${
+                className={`desk-body font-semibold flex-1 h-10 px-1 rounded transition-colors flex items-center justify-center text-center whitespace-nowrap truncate ${
                   actionLoading || !canApproveOverride
-                    ? 'border border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed font-medium'
+                    ? 'border border-gray-200 bg-gray-100 text-ink-muted cursor-not-allowed font-medium'
                     : 'bg-[#0c831f] text-white hover:bg-[#0a6f1a]'
                 }`}
               >

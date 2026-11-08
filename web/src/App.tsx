@@ -349,7 +349,7 @@ export function App() {
       <div className="w-full h-dvh overflow-hidden bg-white">
         <Suspense
           fallback={
-            <div className="w-full h-dvh bg-white flex items-center justify-center text-ink-muted text-[14px]">
+            <div className="w-full h-dvh bg-white flex items-center justify-center text-ink-muted desk-body">
               <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mr-3"></div>
               <span>Loading order desk...</span>
             </div>

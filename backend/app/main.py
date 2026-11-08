@@ -1099,24 +1099,26 @@ def patch_desk_order(
                     old_by_idx[idx].sku_code if idx in old_by_idx else None
                 )
                 if old_sku and old_sku != pl.sku_code:
-                    # Desk changed the SKU: Save an Alias for this retailer
-                    existing_alias = session.exec(
-                        select(Alias).where(
-                            Alias.retailer_id == order.retailer_id,
-                            Alias.original_words == words_clean,
-                        )
-                    ).first()
-                    if existing_alias:
-                        existing_alias.sku_code = pl.sku_code
-                        session.add(existing_alias)
-                    else:
-                        new_alias = Alias(
-                            retailer_id=order.retailer_id,
-                            original_words=words_clean,
-                            sku_code=pl.sku_code,
-                        )
-                        session.add(new_alias)
-                    session.commit()
+                    # Desk changed the SKU: Save an Alias for this retailer (only if category compatible)
+                    from backend.app.capture import RuleBasedParser
+                    if RuleBasedParser().is_category_compatible(words_clean, pl.sku_code):
+                        existing_alias = session.exec(
+                            select(Alias).where(
+                                Alias.retailer_id == order.retailer_id,
+                                Alias.original_words == words_clean,
+                            )
+                        ).first()
+                        if existing_alias:
+                            existing_alias.sku_code = pl.sku_code
+                            session.add(existing_alias)
+                        else:
+                            new_alias = Alias(
+                                retailer_id=order.retailer_id,
+                                original_words=words_clean,
+                                sku_code=pl.sku_code,
+                            )
+                            session.add(new_alias)
+                        session.commit()
 
         # Delete old lines and re-create updated lines
         for ol in old_lines:

@@ -221,6 +221,44 @@ class RuleBasedParser:
         cleaned = re.sub(r"\s+", " ", cleaned).strip()
         return cleaned
 
+    def get_sku_category(self, sku_code: Optional[str]) -> Optional[str]:
+        """Returns the product category name for a given SKU code, or None."""
+        if not sku_code:
+            return None
+        for cat_name, cat_data in self.categories.items():
+            if sku_code in cat_data.get("skus", {}):
+                return cat_name
+        return None
+
+    def get_text_category(self, text: str) -> Optional[str]:
+        """Infers category from keywords in the text (longest keyword match)."""
+        if not text:
+            return None
+        norm = self._normalize_digits(text.lower())
+        best_cat: Optional[str] = None
+        matched_kw_len = 0
+        for cat_name, cat_data in self.categories.items():
+            for kw in cat_data.get("keywords", []):
+                if self._term_matches(kw, norm):
+                    if len(kw) > matched_kw_len:
+                        matched_kw_len = len(kw)
+                        best_cat = cat_name
+        return best_cat
+
+    def is_category_compatible(self, text: str, sku_code: Optional[str]) -> bool:
+        """Enforces that a matched SKU never has a different product category than the item words.
+        Detergent words can never match tea, biscuit words can never match detergent, etc.
+        """
+        if not sku_code or not text:
+            return True
+        sku_cat = self.get_sku_category(sku_code)
+        if not sku_cat:
+            return True
+        text_cat = self.get_text_category(text)
+        if not text_cat:
+            return True
+        return text_cat == sku_cat
+
     def match_item(
         self,
         item_text: str,
@@ -247,9 +285,19 @@ class RuleBasedParser:
 
         # -----------------------------------------------------------------
         # Step (a): Retailer's Alias exact match -> High Confidence
+        # Only valid if category compatible (detergent words can never match tea)
         # -----------------------------------------------------------------
+        def _valid_alias(cand_sku: Optional[str]) -> bool:
+            if not cand_sku:
+                return False
+            if not self.is_category_compatible(original_words, cand_sku):
+                return False
+            if not self.is_category_compatible(item_text, cand_sku):
+                return False
+            return True
+
         for cand in [norm_words, clean_words, norm_item, clean_item]:
-            if cand in alias_map:
+            if cand in alias_map and _valid_alias(alias_map[cand]):
                 matched_sku = alias_map[cand]
                 confidence = "high"
                 break
@@ -257,13 +305,15 @@ class RuleBasedParser:
         if not matched_sku:
             clean_alias_map = {self._clean_for_alias_match(k): v for k, v in alias_map.items()}
             for cand in [norm_words, clean_words, norm_item, clean_item]:
-                if cand in clean_alias_map:
+                if cand in clean_alias_map and _valid_alias(clean_alias_map[cand]):
                     matched_sku = clean_alias_map[cand]
                     confidence = "high"
                     break
 
         if not matched_sku:
             for alias_words, alias_sku in alias_map.items():
+                if not _valid_alias(alias_sku):
+                    continue
                 clean_alias = self._clean_for_alias_match(alias_words)
                 if alias_words and (
                     alias_words in norm_words
@@ -332,11 +382,24 @@ class RuleBasedParser:
                 confidence = "medium" if competing else "high"
 
         # -----------------------------------------------------------------
+        # Post-match safeguard: Category compatibility
+        # A matched SKU must never have a different product category than the item words
+        # -----------------------------------------------------------------
+        if matched_sku:
+            if not self.is_category_compatible(original_words, matched_sku) or not self.is_category_compatible(item_text, matched_sku):
+                matched_sku = None
+                confidence = "low"
+                alternatives = []
+                if "no_match" not in flags:
+                    flags.append("no_match")
+
+        # -----------------------------------------------------------------
         # Step (d): No Match -> Low Confidence, no SKU
         # -----------------------------------------------------------------
         if not matched_sku:
             confidence = "low"
-            flags.append("no_match")
+            if "no_match" not in flags:
+                flags.append("no_match")
         else:
             # Check out of stock flag
             sku_obj = all_skus.get(matched_sku)
@@ -436,6 +499,54 @@ class LLMParser:
             if RuleBasedParser._term_matches(cand, norm):
                 return unit
         return "unknown"
+
+    def _shares_keyword_or_alias(
+        self,
+        item_text: str,
+        sku_code: Optional[str],
+        alias_map: Dict[str, str],
+        all_skus: Dict[str, Any],
+    ) -> bool:
+        """Checks if the LLM's item_text and the matched SKU share any keyword, size hint, or alias."""
+        if not sku_code or not item_text:
+            return False
+
+        norm_item = self.fallback._normalize_digits(item_text.lower())
+        clean_item = self.fallback._clean_for_alias_match(norm_item)
+
+        # 1. Check if item_text matches an alias for sku_code
+        for alias_words, alias_sku in alias_map.items():
+            if alias_sku == sku_code:
+                clean_alias = self.fallback._clean_for_alias_match(alias_words)
+                if (
+                    clean_item == clean_alias
+                    or clean_alias in clean_item
+                    or clean_item in clean_alias
+                    or self.fallback._term_matches(clean_alias, norm_item)
+                ):
+                    return True
+
+        # 2. Check if item_text matches keywords or size hints for sku_code's category
+        sku_cat = self.fallback.get_sku_category(sku_code)
+        if sku_cat and sku_cat in self.fallback.categories:
+            cat_data = self.fallback.categories[sku_cat]
+            for kw in cat_data.get("keywords", []):
+                if self.fallback._term_matches(kw, norm_item):
+                    return True
+            sku_info = cat_data.get("skus", {}).get(sku_code, {})
+            for hint in sku_info.get("hints", []):
+                if self.fallback._term_matches(hint, norm_item):
+                    return True
+
+        # 3. Check if any distinctive word from SKU name matches item_text
+        sku_obj = all_skus.get(sku_code)
+        if sku_obj and sku_obj.name:
+            for word in re.findall(r"\w+", sku_obj.name.lower()):
+                if len(word) > 2 and word not in ("case", "piece", "packet", "pack", "box"):
+                    if self.fallback._term_matches(word, norm_item):
+                        return True
+
+        return False
 
     def parse(self, text: str, retailer_id: int, session: Any) -> CaptureResult:
         try:
@@ -558,6 +669,14 @@ class LLMParser:
                 past_sku_counts=past_sku_counts,
                 all_skus=all_skus,
             )
+
+            # Guard: if the LLM's item_text and matched SKU share no keyword or alias,
+            # downgrade the line to Low and list alternatives
+            if matched_sku and not self._shares_keyword_or_alias(item_text, matched_sku, alias_map, all_skus):
+                confidence = "low"
+                if not alternatives:
+                    competing = [sc for sc in all_skus.keys() if sc != matched_sku]
+                    alternatives = competing[:2]
 
             if unit == "unknown" and "needs_unit" not in flags:
                 flags.append("needs_unit")

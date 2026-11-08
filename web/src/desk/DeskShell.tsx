@@ -348,16 +348,16 @@ export const DeskShell: React.FC<DeskShellProps> = ({
   }, [orders, selectedOrderId, activeOrder, loadOrderDetail]);
 
   return (
-    <div className="w-full h-dvh max-h-dvh overflow-hidden bg-white text-ink flex flex-row min-h-0">
+    <div className="desk-shell w-full h-dvh max-h-dvh overflow-hidden bg-white text-ink flex flex-row min-h-0" lang={lang}>
       {/* Sidebar: Fixed 200px Width, 40px nav items */}
       <aside className="w-[200px] shrink-0 h-full bg-white border-r border-border flex flex-col justify-between z-30 select-none overflow-hidden min-h-0">
         <div className="flex flex-col">
           {/* Header Branding (about 56px) */}
           <div className="h-14 shrink-0 px-4 border-b border-border flex flex-col justify-center">
-            <span className="text-[18px] font-bold text-ink leading-tight">
+            <span className="desk-title text-ink leading-tight">
               {t.company_name}
             </span>
-            <span className="text-[13px] text-ink-muted leading-tight">
+            <span className="desk-meta text-ink-muted leading-tight">
               {t.order_desk}
             </span>
           </div>
@@ -367,7 +367,7 @@ export const DeskShell: React.FC<DeskShellProps> = ({
             <button
               type="button"
               onClick={() => setActiveNav('orders')}
-              className={`h-10 flex items-center px-4 transition-colors border-l-4 text-[14px] ${
+              className={`h-10 flex items-center px-4 transition-colors border-l-4 desk-body ${
                 activeNav === 'orders'
                   ? 'border-primary text-primary font-semibold bg-primary-50'
                   : 'border-transparent text-ink-muted hover:text-ink hover:bg-gray-50'
@@ -379,7 +379,7 @@ export const DeskShell: React.FC<DeskShellProps> = ({
             <button
               type="button"
               onClick={() => setActiveNav('capture')}
-              className={`h-10 flex items-center px-4 transition-colors border-l-4 text-[14px] ${
+              className={`h-10 flex items-center px-4 transition-colors border-l-4 desk-body ${
                 activeNav === 'capture'
                   ? 'border-primary text-primary font-semibold bg-primary-50'
                   : 'border-transparent text-ink-muted hover:text-ink hover:bg-gray-50'
@@ -391,7 +391,7 @@ export const DeskShell: React.FC<DeskShellProps> = ({
             <button
               type="button"
               onClick={() => setActiveNav('export')}
-              className={`h-10 flex items-center px-4 transition-colors border-l-4 text-[14px] ${
+              className={`h-10 flex items-center px-4 transition-colors border-l-4 desk-body ${
                 activeNav === 'export'
                   ? 'border-primary text-primary font-semibold bg-primary-50'
                   : 'border-transparent text-ink-muted hover:text-ink hover:bg-gray-50'
@@ -406,7 +406,7 @@ export const DeskShell: React.FC<DeskShellProps> = ({
         {/* Bottom Sidebar: Staff Name, Language Toggle & Logout */}
         <div className="p-3 border-t border-border flex flex-col gap-2.5 shrink-0">
           {/* Staff name as plain text */}
-          <div className="text-[14px] font-medium text-ink truncate px-1">
+          <div className="desk-body font-medium text-ink truncate px-1">
             {user.name}
           </div>
 
@@ -415,7 +415,7 @@ export const DeskShell: React.FC<DeskShellProps> = ({
             <button
               type="button"
               onClick={lang === 'en' ? undefined : onToggleLang}
-              className={`flex-1 h-7 rounded text-[13px] font-semibold flex items-center justify-center transition-colors ${
+              className={`flex-1 h-7 rounded desk-body font-semibold flex items-center justify-center transition-colors ${
                 lang === 'en'
                   ? 'bg-primary text-white'
                   : 'text-ink-muted hover:text-ink'
@@ -426,7 +426,7 @@ export const DeskShell: React.FC<DeskShellProps> = ({
             <button
               type="button"
               onClick={lang === 'hi' ? undefined : onToggleLang}
-              className={`flex-1 h-7 rounded text-[13px] font-semibold flex items-center justify-center transition-colors ${
+              className={`flex-1 h-7 rounded desk-body font-semibold flex items-center justify-center transition-colors ${
                 lang === 'hi'
                   ? 'bg-primary text-white'
                   : 'text-ink-muted hover:text-ink'
@@ -440,7 +440,7 @@ export const DeskShell: React.FC<DeskShellProps> = ({
           <button
             type="button"
             onClick={onLogout}
-            className="h-10 flex items-center gap-2.5 text-[14px] text-error hover:text-red-700 hover:bg-red-50 rounded transition-colors px-1 font-medium"
+            className="h-10 flex items-center gap-2.5 desk-body font-semibold text-error hover:text-red-700 hover:bg-red-50 rounded transition-colors px-1"
           >
             <LogoutIcon className="w-5 h-5 text-error" />
             <span>{t.logout}</span>

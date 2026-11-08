@@ -246,7 +246,7 @@ export const CaptureView: React.FC<CaptureViewProps> = ({
     <div className="w-full flex-1 h-full min-h-0 flex flex-col bg-white overflow-hidden select-none">
       {/* 1. Heading row (48px) */}
       <div className="h-12 shrink-0 px-6 border-b border-border flex items-center justify-between bg-white">
-        <h2 className="text-[18px] font-bold text-ink shrink-0 leading-none">
+        <h2 className="desk-title text-ink shrink-0 leading-none">
           {t.title_capture}
         </h2>
 
@@ -254,7 +254,7 @@ export const CaptureView: React.FC<CaptureViewProps> = ({
         <div className="flex items-center shrink-0">
           <label
             htmlFor="retailer-search"
-            className="text-[13px] font-medium text-ink-muted mr-2 shrink-0"
+            className="desk-meta font-medium text-ink-muted mr-2 shrink-0"
           >
             {t.retailer_label}:
           </label>
@@ -266,7 +266,7 @@ export const CaptureView: React.FC<CaptureViewProps> = ({
               onChange={handleRetailerInputChange}
               onFocus={() => setIsDropdownOpen(true)}
               placeholder={t.select_retailer}
-              className="h-9 w-full px-3 pr-8 text-[14px] border border-border rounded bg-white text-ink focus:outline-none focus:border-primary truncate"
+              className="h-9 w-full px-3 pr-8 desk-body border border-border rounded bg-white text-ink focus:outline-none focus:border-primary truncate"
             />
             <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-ink-muted">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -280,7 +280,7 @@ export const CaptureView: React.FC<CaptureViewProps> = ({
                   <li
                     key={r.id}
                     onClick={() => handleSelectRetailer(r)}
-                    className={`px-3 py-2 text-[14px] text-ink hover:bg-gray-50 cursor-pointer truncate ${
+                    className={`px-3 py-2 desk-body text-ink hover:bg-gray-50 cursor-pointer truncate ${
                       r.id === selectedRetailerId ? 'bg-gray-50 font-semibold' : ''
                     }`}
                   >
@@ -311,12 +311,12 @@ export const CaptureView: React.FC<CaptureViewProps> = ({
             }
           }}
           placeholder={t.capture_input_placeholder}
-          className="w-full text-[14px] text-ink border border-border rounded p-2.5 min-h-[72px] max-h-[144px] resize-y focus:outline-none focus:border-primary placeholder:text-ink-muted leading-snug"
+          className="w-full desk-body text-ink border border-border rounded p-2.5 min-h-[72px] max-h-[144px] resize-y focus:outline-none focus:border-primary placeholder:text-ink-muted leading-snug"
         />
 
         {/* Below textarea: Example line on the left, Read message button on the right */}
         <div className="flex items-center justify-between gap-4">
-          <div className="text-[13px] text-ink-muted flex-1 min-w-0">
+          <div className="desk-meta text-ink-muted flex-1 min-w-0">
             <span>{t.capture_example_label} · </span>
             <button
               type="button"
@@ -334,9 +334,9 @@ export const CaptureView: React.FC<CaptureViewProps> = ({
             type="button"
             onClick={handleParse}
             disabled={parsing || !messageText.trim() || !selectedRetailerId}
-            className={`h-10 px-6 rounded text-[13px] font-semibold transition-colors shrink-0 flex items-center justify-center whitespace-nowrap ${
+            className={`desk-body font-semibold h-10 px-6 rounded transition-colors shrink-0 flex items-center justify-center whitespace-nowrap ${
               parsing || !messageText.trim() || !selectedRetailerId
-                ? 'bg-gray-100 text-ink-subtle cursor-not-allowed font-medium'
+                ? 'bg-gray-100 text-ink-muted cursor-not-allowed font-medium'
                 : 'bg-primary text-white hover:bg-[#0a6f1a]'
             }`}
           >
@@ -346,7 +346,7 @@ export const CaptureView: React.FC<CaptureViewProps> = ({
 
         {/* Failure message with Retry button */}
         {parseError && (
-          <div className="flex items-center justify-between px-3 py-1.5 bg-red-50 border border-red-200 rounded text-error text-[13px]">
+          <div className="flex items-center justify-between px-3 py-1.5 bg-red-50 border border-red-200 rounded text-error desk-meta">
             <span>{parseError}</span>
             <button
               type="button"
@@ -360,7 +360,7 @@ export const CaptureView: React.FC<CaptureViewProps> = ({
 
         {/* Success message */}
         {successMsg && (
-          <div className="px-3 py-1.5 bg-[#f0fdf4] border border-[#bbf7d0] rounded text-primary text-[13px] font-semibold">
+          <div className="px-3 py-1.5 bg-[#f0fdf4] border border-[#bbf7d0] rounded text-primary desk-meta font-semibold">
             {successMsg}
           </div>
         )}
@@ -369,19 +369,19 @@ export const CaptureView: React.FC<CaptureViewProps> = ({
       {/* 3. Results region (flex-1, min-h-0, overflow-y-auto) */}
       <div className="w-full flex-1 min-h-0 overflow-y-auto px-6 py-4">
         {!hasResult ? (
-          <div className="flex items-center justify-center h-48 text-ink-muted text-[14px]">
+          <div className="flex items-center justify-center h-48 text-ink-muted desk-body">
             {t.capture_empty_short}
           </div>
         ) : (
           <table className="w-full text-left border-collapse">
             <thead className="sticky top-0 bg-gray-50 z-10 border-b border-border">
-              <tr className="h-9 text-ink-muted text-[13px]">
-                <th className="px-3 font-medium bg-gray-50">{t.col_original_words}</th>
-                <th className="px-3 font-medium bg-gray-50">{t.col_product}</th>
-                <th className="px-3 font-medium text-center bg-gray-50">{t.col_cases}</th>
-                <th className="px-3 font-medium text-center bg-gray-50">{t.col_unit}</th>
-                <th className="px-3 font-medium text-center bg-gray-50">{t.col_confidence}</th>
-                <th className="px-3 font-medium bg-gray-50">{t.col_alternatives}</th>
+              <tr className="h-9 text-ink-muted desk-meta font-semibold">
+                <th className="px-3 font-semibold bg-gray-50">{t.col_original_words}</th>
+                <th className="px-3 font-semibold bg-gray-50">{t.col_product}</th>
+                <th className="px-3 font-semibold text-right tabular-nums bg-gray-50">{t.col_cases}</th>
+                <th className="px-3 font-semibold text-center bg-gray-50">{t.col_unit}</th>
+                <th className="px-3 font-semibold text-center bg-gray-50">{t.col_confidence}</th>
+                <th className="px-3 font-semibold bg-gray-50">{t.col_alternatives}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -402,12 +402,12 @@ export const CaptureView: React.FC<CaptureViewProps> = ({
                 return (
                   <tr
                     key={idx}
-                    className={`h-11 text-[14px] hover:bg-gray-50 transition-colors ${
+                    className={`h-11 desk-body hover:bg-gray-50 transition-colors ${
                       isOutOfStock ? 'bg-red-50/20' : ''
                     }`}
                   >
                     {/* Original Words */}
-                    <td className="px-3 text-ink-muted text-[13px] italic max-w-[200px] truncate">
+                    <td className="px-3 text-ink-muted desk-meta italic max-w-[200px] truncate">
                       {line.original_words ? `"${line.original_words}"` : '—'}
                     </td>
 
@@ -418,7 +418,7 @@ export const CaptureView: React.FC<CaptureViewProps> = ({
                       ) : isOutOfStock ? (
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="line-through text-ink-muted">{productName}</span>
-                          <span className="text-error text-[12px] font-semibold no-underline">
+                          <span className="text-error desk-meta font-semibold no-underline">
                             ({t.out_of_stock})
                           </span>
                         </div>
@@ -427,8 +427,8 @@ export const CaptureView: React.FC<CaptureViewProps> = ({
                       )}
                     </td>
 
-                    {/* Cases (editable input) */}
-                    <td className="px-3 text-center">
+                    {/* Cases (editable input, right-aligned, tabular-nums) */}
+                    <td className="px-3 text-right">
                       {isOutOfStock || isNoMatch ? (
                         <span className="text-ink-muted line-through tabular-nums">
                           {line.qty || line.qty_cases || 1}
@@ -441,7 +441,7 @@ export const CaptureView: React.FC<CaptureViewProps> = ({
                           onChange={(e) =>
                             handleQtyChange(idx, parseInt(e.target.value) || 1)
                           }
-                          className="w-16 h-8 text-center border border-border rounded text-[14px] font-semibold text-ink focus:outline-none focus:border-primary tabular-nums bg-white"
+                          className="w-16 h-8 text-right px-2 border border-border rounded desk-body font-semibold text-ink focus:outline-none focus:border-primary tabular-nums bg-white"
                         />
                       )}
                     </td>
@@ -449,13 +449,13 @@ export const CaptureView: React.FC<CaptureViewProps> = ({
                     {/* Unit ("Cases or pieces?" choice if unit is unknown/needs_unit) */}
                     <td className="px-3 text-center">
                       {isOutOfStock || isNoMatch ? (
-                        <span className="text-ink-muted text-[13px]">—</span>
+                        <span className="text-ink-muted desk-meta">—</span>
                       ) : needsUnit ? (
                         <div className="inline-flex items-center gap-1 border border-border rounded overflow-hidden p-0.5 bg-gray-50">
                           <button
                             type="button"
                             onClick={() => handleSetUnit(idx, 'case')}
-                            className={`px-2 py-0.5 text-[12px] rounded font-medium transition-colors ${
+                            className={`px-2 py-0.5 desk-meta rounded font-semibold transition-colors ${
                               line.unit === 'case'
                                 ? 'bg-primary text-white shadow-none'
                                 : 'text-ink hover:bg-white'
@@ -466,7 +466,7 @@ export const CaptureView: React.FC<CaptureViewProps> = ({
                           <button
                             type="button"
                             onClick={() => handleSetUnit(idx, 'piece')}
-                            className={`px-2 py-0.5 text-[12px] rounded font-medium transition-colors border-l border-border ${
+                            className={`px-2 py-0.5 desk-meta rounded font-semibold transition-colors border-l border-border ${
                               line.unit === 'piece'
                                 ? 'bg-primary text-white shadow-none'
                                 : 'text-ink hover:bg-white'
@@ -476,7 +476,7 @@ export const CaptureView: React.FC<CaptureViewProps> = ({
                           </button>
                         </div>
                       ) : (
-                        <span className="text-[13px] text-ink font-medium">
+                        <span className="desk-meta text-ink font-medium">
                           {line.unit === 'case'
                             ? t.unit_case
                             : line.unit === 'piece'
@@ -489,30 +489,30 @@ export const CaptureView: React.FC<CaptureViewProps> = ({
                     {/* Confidence */}
                     <td className="px-3 text-center">
                       {isOutOfStock || isNoMatch ? (
-                        <span className="text-ink-muted text-[13px]">—</span>
+                        <span className="text-ink-muted desk-meta">—</span>
                       ) : line.confidence === 'high' ||
                         (typeof line.confidence === 'number' && line.confidence >= 0.8) ? (
-                        <span className="text-[13px] font-semibold text-primary">
+                        <span className="desk-meta font-semibold text-primary">
                           {t.confidence_high}
                         </span>
                       ) : line.confidence === 'medium' ||
                         (typeof line.confidence === 'number' && line.confidence >= 0.5) ? (
-                        <span className="text-[13px] font-semibold text-amber-700">
+                        <span className="desk-meta font-semibold text-amber-700">
                           {t.confidence_medium}
                         </span>
                       ) : line.confidence === 'low' ||
                         (typeof line.confidence === 'number' && line.confidence < 0.5) ? (
-                        <span className="text-[13px] font-semibold text-error">
+                        <span className="desk-meta font-semibold text-error">
                           {t.confidence_low}
                         </span>
                       ) : (
-                        <span className="text-[13px] text-ink-muted">
+                        <span className="desk-meta text-ink-muted">
                           {line.confidence || '—'}
                         </span>
                       )}
                     </td>
 
-                    {/* Alternatives */}
+                    {/* Alternatives select (at least 14px) */}
                     <td className="px-3">
                       {line.alternatives && line.alternatives.length > 0 ? (
                         <select
@@ -520,7 +520,7 @@ export const CaptureView: React.FC<CaptureViewProps> = ({
                           onChange={(e) =>
                             e.target.value && handleSelectAlternative(idx, e.target.value)
                           }
-                          className="h-7 px-2 text-[12px] border border-border rounded bg-white text-ink focus:outline-none cursor-pointer max-w-[200px] truncate"
+                          className="h-8 px-2 desk-body border border-border rounded bg-white text-ink focus:outline-none cursor-pointer max-w-[200px] truncate"
                         >
                           <option value="">{t.select_alternative}</option>
                           {line.alternatives.map((altCode: string) => {
@@ -533,7 +533,7 @@ export const CaptureView: React.FC<CaptureViewProps> = ({
                           })}
                         </select>
                       ) : (
-                        <span className="text-ink-muted text-[13px]">—</span>
+                        <span className="text-ink-muted desk-meta">—</span>
                       )}
                     </td>
                   </tr>
@@ -545,16 +545,16 @@ export const CaptureView: React.FC<CaptureViewProps> = ({
       </div>
 
       {/* 4. Footer (fixed at bottom, border-top, 56px) */}
-      <div className="h-14 shrink-0 px-6 border-t border-border bg-white flex items-center justify-between text-[14px]">
+      <div className="h-14 shrink-0 px-6 border-t border-border bg-white flex items-center justify-between">
         <div>
           {hasResult && (
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-ink">{t.preview_payable}:</span>
-              <span className="font-bold text-primary tabular-nums">
+              <span className="desk-meta font-semibold text-ink">{t.preview_payable}:</span>
+              <span className="desk-money-lg text-primary tabular-nums">
                 {formatINR(previewPayable)}
               </span>
               {excludedCount > 0 && (
-                <span className="text-ink-muted text-[13px]">
+                <span className="text-ink-muted desk-meta">
                   ·{' '}
                   {excludedCount === 1
                     ? t.lines_excluded.replace('{count}', String(excludedCount))
@@ -570,7 +570,7 @@ export const CaptureView: React.FC<CaptureViewProps> = ({
             type="button"
             onClick={handleDiscard}
             disabled={!hasResult || confirming || parsing}
-            className="h-10 px-4 rounded text-[13px] font-medium border border-border text-ink hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+            className="desk-body font-semibold h-10 px-4 rounded border border-border text-ink hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
           >
             {t.btn_discard}
           </button>
@@ -578,10 +578,10 @@ export const CaptureView: React.FC<CaptureViewProps> = ({
             type="button"
             onClick={handleConfirmOrder}
             disabled={!canConfirm}
-            className={`h-10 px-6 rounded text-[13px] font-semibold transition-colors whitespace-nowrap ${
+            className={`desk-body font-semibold h-10 px-6 rounded transition-colors whitespace-nowrap ${
               canConfirm
                 ? 'bg-primary text-white hover:bg-[#0a6f1a]'
-                : 'bg-gray-100 text-ink-subtle cursor-not-allowed font-medium'
+                : 'bg-gray-100 text-ink-muted cursor-not-allowed font-medium'
             }`}
           >
             {confirming ? t.confirming : t.btn_confirm_order}

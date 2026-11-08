@@ -87,15 +87,15 @@ export const OrderQueue: React.FC<OrderQueueProps> = ({
   const getStatusDisplay = (status: OrderStatus) => {
     switch (status) {
       case 'credit_hold':
-        return <span className="font-semibold text-error">{t.status_credit_hold}</span>;
+        return <span className="desk-body font-semibold text-error">{t.status_credit_hold}</span>;
       case 'pending':
-        return <span className="text-ink-muted">{t.status_pending}</span>;
+        return <span className="desk-body text-ink-muted">{t.status_pending}</span>;
       case 'approved':
-        return <span className="font-semibold text-primary">{t.status_approved}</span>;
+        return <span className="desk-body font-semibold text-primary">{t.status_approved}</span>;
       case 'cancelled':
-        return <span className="text-ink-subtle">{t.status_cancelled}</span>;
+        return <span className="desk-body text-ink-muted">{t.status_cancelled}</span>;
       default:
-        return <span className="text-ink-muted">{status}</span>;
+        return <span className="desk-body text-ink-muted">{status}</span>;
     }
   };
 
@@ -122,14 +122,14 @@ export const OrderQueue: React.FC<OrderQueueProps> = ({
               value={localSearch}
               onChange={(e) => setLocalSearch(e.target.value)}
               placeholder={t.search_retailer_placeholder}
-              className="w-full h-9 pl-9 pr-3 text-[14px] bg-white border border-border rounded text-ink placeholder:text-ink-muted focus:outline-none focus:border-primary"
+              className="w-full h-9 pl-9 pr-3 desk-body bg-white border border-border rounded text-ink placeholder:text-ink-muted focus:outline-none focus:border-primary"
             />
           </div>
 
           {/* Date Range Inputs */}
           <div className="flex items-center gap-1.5 shrink-0">
             <div className="flex items-center border border-border rounded bg-white h-9 px-2">
-              <span className="text-[13px] font-medium text-ink-muted mr-1.5 uppercase">
+              <span className="desk-meta font-medium text-ink-muted mr-1.5 uppercase">
                 {t.from_date}
               </span>
               <input
@@ -137,12 +137,12 @@ export const OrderQueue: React.FC<OrderQueueProps> = ({
                 lang="en-IN"
                 value={fromDate}
                 onChange={(e) => onFromDateChange(e.target.value)}
-                className="text-[14px] text-ink bg-transparent focus:outline-none"
+                className="desk-body text-ink bg-transparent focus:outline-none"
               />
             </div>
-            <span className="text-ink-muted text-[13px]">→</span>
+            <span className="text-ink-muted desk-meta">→</span>
             <div className="flex items-center border border-border rounded bg-white h-9 px-2">
-              <span className="text-[13px] font-medium text-ink-muted mr-1.5 uppercase">
+              <span className="desk-meta font-medium text-ink-muted mr-1.5 uppercase">
                 {t.to_date}
               </span>
               <input
@@ -150,7 +150,7 @@ export const OrderQueue: React.FC<OrderQueueProps> = ({
                 lang="en-IN"
                 value={toDate}
                 onChange={(e) => onToDateChange(e.target.value)}
-                className="text-[14px] text-ink bg-transparent focus:outline-none"
+                className="desk-body text-ink bg-transparent focus:outline-none"
               />
             </div>
           </div>
@@ -167,7 +167,7 @@ export const OrderQueue: React.FC<OrderQueueProps> = ({
                   key={tab.id}
                   type="button"
                   onClick={() => onStatusTabChange(tab.id)}
-                  className={`py-1 px-2 text-[13px] transition-colors border-b-2 flex items-center gap-1 shrink-0 ${
+                  className={`py-1 px-2 desk-body transition-colors border-b-2 flex items-center gap-1 shrink-0 ${
                     isActive
                       ? 'border-primary text-primary font-semibold -mb-[1px]'
                       : 'border-transparent text-ink-muted hover:text-ink'
@@ -175,7 +175,7 @@ export const OrderQueue: React.FC<OrderQueueProps> = ({
                 >
                   <span className="whitespace-nowrap">{tab.label}</span>
                   <span
-                    className={`text-[12px] px-1 py-0.2 rounded-full ${
+                    className={`desk-meta px-1 py-0.2 rounded-full ${
                       isActive
                         ? 'bg-primary-50 text-primary font-semibold'
                         : 'text-ink-muted'
@@ -189,7 +189,7 @@ export const OrderQueue: React.FC<OrderQueueProps> = ({
           </div>
 
           {/* Shortcut hint on right, same line */}
-          <div className="text-[12px] text-ink-muted tracking-tight whitespace-nowrap pl-2 truncate shrink-0">
+          <div className="desk-meta text-ink-muted tracking-tight whitespace-nowrap pl-2 truncate shrink-0">
             {t.keyboard_shortcuts}
           </div>
         </div>
@@ -198,35 +198,35 @@ export const OrderQueue: React.FC<OrderQueueProps> = ({
       {/* Orders Table Area: Fills remaining height with vertical scroll, sticky header, 36px rows */}
       <div className="w-full flex-1 min-h-0 overflow-y-auto">
         {loading ? (
-          <div className="flex flex-col items-center justify-center h-48 text-ink-muted text-[14px]">
+          <div className="flex flex-col items-center justify-center h-48 text-ink-muted desk-body">
             <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mb-3"></div>
             <span>{t.loading_orders}</span>
           </div>
         ) : error ? (
-          <div className="flex flex-col items-center justify-center h-48 text-[14px]">
+          <div className="flex flex-col items-center justify-center h-48 desk-body">
             <p className="text-error font-medium mb-3">{error}</p>
             <button
               type="button"
               onClick={onRetry}
-              className="px-4 py-1.5 border border-border rounded text-ink hover:bg-gray-50 text-[14px]"
+              className="px-4 py-1.5 border border-border rounded text-ink hover:bg-gray-50 desk-body font-semibold"
             >
               {t.btn_retry}
             </button>
           </div>
         ) : orders.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-48 text-[14px] text-ink-muted">
-            <p className="font-semibold text-ink text-[16px] mb-1">{t.empty_orders_title}</p>
-            <p className="text-[13px]">{t.empty_orders_desc}</p>
+          <div className="flex flex-col items-center justify-center h-48 desk-body text-ink-muted">
+            <p className="desk-title text-ink mb-1">{t.empty_orders_title}</p>
+            <p className="desk-meta">{t.empty_orders_desc}</p>
           </div>
         ) : (
           <table className="w-full text-left border-collapse">
             <thead className="sticky top-0 bg-gray-50 z-10">
-              <tr className="h-9 border-b border-border text-ink-muted text-[13px]">
-                <th className="px-3 font-medium bg-gray-50">{t.col_retailer}</th>
-                <th className="px-3 font-medium text-right bg-gray-50">{t.col_total}</th>
-                <th className="px-3 font-medium bg-gray-50">{t.col_status}</th>
-                <th className="px-3 font-medium bg-gray-50">{t.col_date}</th>
-                <th className="px-3 font-medium text-right bg-gray-50">{t.col_time}</th>
+              <tr className="h-9 border-b border-border text-ink-muted desk-meta font-semibold">
+                <th className="px-3 font-semibold bg-gray-50">{t.col_retailer}</th>
+                <th className="px-3 font-semibold text-right tabular-nums bg-gray-50">{t.col_total}</th>
+                <th className="px-3 font-semibold bg-gray-50">{t.col_status}</th>
+                <th className="px-3 font-semibold tabular-nums bg-gray-50">{t.col_date}</th>
+                <th className="px-3 font-semibold text-right tabular-nums bg-gray-50">{t.col_time}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -237,7 +237,7 @@ export const OrderQueue: React.FC<OrderQueueProps> = ({
                     key={order.id}
                     ref={isSelected ? selectedRowRef : undefined}
                     onClick={() => onSelectOrder(order.id)}
-                    className={`h-9 cursor-pointer transition-colors text-[14px] ${
+                    className={`h-9 cursor-pointer transition-colors desk-body ${
                       isSelected
                         ? 'bg-[#f0fdf4] font-medium'
                         : 'hover:bg-gray-50'
@@ -253,23 +253,23 @@ export const OrderQueue: React.FC<OrderQueueProps> = ({
                       </div>
                     </td>
 
-                    {/* Total (Tabular Nums) */}
+                    {/* Total (Tabular Nums, right-aligned) */}
                     <td className="px-3 text-right font-semibold text-ink tabular-nums">
                       {formatINR(order.total)}
                     </td>
 
                     {/* Status */}
-                    <td className="px-3 text-[13px]">
+                    <td className="px-3">
                       {getStatusDisplay(order.status)}
                     </td>
 
                     {/* Date */}
-                    <td className="px-3 text-ink-muted text-[13px] tabular-nums whitespace-nowrap">
+                    <td className="px-3 text-ink-muted desk-meta tabular-nums whitespace-nowrap">
                       {formatDateOnly(order.created_at)}
                     </td>
 
                     {/* Time */}
-                    <td className="px-3 text-right text-ink-muted text-[13px] tabular-nums whitespace-nowrap">
+                    <td className="px-3 text-right text-ink-muted desk-meta tabular-nums whitespace-nowrap">
                       {formatTimeOnly(order.created_at)}
                     </td>
                   </tr>
@@ -281,16 +281,16 @@ export const OrderQueue: React.FC<OrderQueueProps> = ({
       </div>
 
       {/* Paging Bar: Pinned at the bottom, 40px tall */}
-      <div className="h-10 shrink-0 border-t border-border flex items-center justify-between text-[13px] pt-1 mt-auto">
+      <div className="h-10 shrink-0 border-t border-border flex items-center justify-between desk-meta pt-1 mt-auto">
         <span className="text-ink-muted tabular-nums">{paginationText}</span>
         <div className="flex items-center gap-2">
           <button
             type="button"
             disabled={pageOffset === 0 || loading}
             onClick={() => onPageChange(Math.max(0, pageOffset - pageSize))}
-            className={`px-3 h-8 border border-border rounded text-[13px] transition-colors ${
+            className={`px-3 h-8 border border-border rounded desk-body font-semibold transition-colors ${
               pageOffset === 0 || loading
-                ? 'bg-gray-100 text-ink-subtle cursor-not-allowed opacity-60'
+                ? 'bg-gray-100 text-ink-muted cursor-not-allowed opacity-60 font-medium'
                 : 'text-ink hover:bg-gray-50'
             }`}
           >
@@ -300,9 +300,9 @@ export const OrderQueue: React.FC<OrderQueueProps> = ({
             type="button"
             disabled={pageOffset + pageSize >= total || loading}
             onClick={() => onPageChange(pageOffset + pageSize)}
-            className={`px-3 h-8 border border-border rounded text-[13px] transition-colors ${
+            className={`px-3 h-8 border border-border rounded desk-body font-semibold transition-colors ${
               pageOffset + pageSize >= total || loading
-                ? 'bg-gray-100 text-ink-subtle cursor-not-allowed opacity-60'
+                ? 'bg-gray-100 text-ink-muted cursor-not-allowed opacity-60 font-medium'
                 : 'text-ink hover:bg-gray-50'
             }`}
           >
