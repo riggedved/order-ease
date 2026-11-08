@@ -19,6 +19,8 @@ export interface DeskTranslations {
   col_status: string;
   col_source: string;
   col_age: string;
+  col_date: string;
+  col_time: string;
   source_app: string;
   source_message: string;
   source_desk: string;
@@ -70,9 +72,31 @@ export interface DeskTranslations {
   approved_by_info: string;
   override_reason_note: string;
   title_capture: string;
+  retailer_label: string;
   select_retailer: string;
   capture_input_placeholder: string;
   btn_parse: string;
+  btn_read_message: string;
+  reading_message: string;
+  capture_example_label: string;
+  capture_try_example: string;
+  capture_empty_short: string;
+  col_original_words: string;
+  col_unit: string;
+  col_alternatives: string;
+  not_found: string;
+  out_of_stock: string;
+  cases_or_pieces: string;
+  unit_case: string;
+  unit_piece: string;
+  confidence_high: string;
+  confidence_medium: string;
+  confidence_low: string;
+  select_alternative: string;
+  preview_payable: string;
+  lines_excluded: string;
+  lines_excluded_plural: string;
+  btn_discard: string;
   btn_confirm_order: string;
   col_confidence: string;
   capture_empty: string;
@@ -105,8 +129,10 @@ export const deskTranslations: Record<DeskLanguage, DeskTranslations> = {
     col_retailer: 'Retailer',
     col_total: 'Total',
     col_status: 'Status',
-    col_source: 'Source',
-    col_age: 'Age',
+    col_source: 'Date',
+    col_age: 'Time',
+    col_date: 'Date',
+    col_time: 'Time',
     source_app: 'App',
     source_message: 'Message',
     source_desk: 'Desk',
@@ -115,7 +141,7 @@ export const deskTranslations: Record<DeskLanguage, DeskTranslations> = {
     status_credit_hold: 'Credit hold',
     status_approved: 'Approved',
     status_cancelled: 'Cancelled',
-    keyboard_shortcuts: '↑↓ navigate  ·  Enter open  ·  A approve  ·  O override',
+    keyboard_shortcuts: '↑↓ navigate  ·  A approve  ·  O override',
     pagination_summary: '{from}–{to} of {total}',
     btn_previous: 'Previous',
     btn_next: 'Next',
@@ -157,13 +183,35 @@ export const deskTranslations: Record<DeskLanguage, DeskTranslations> = {
     btn_reload: 'Reload',
     approved_by_info: 'Approved by {name}, {time}',
     override_reason_note: 'Override note: {reason}',
-    title_capture: 'Vernacular AI Order Capture',
+    title_capture: 'Capture an order',
+    retailer_label: 'Retailer',
     select_retailer: 'Select retailer',
-    capture_input_placeholder: 'Type or paste order message (e.g. 5 biscuit, 2 oil...)',
+    capture_input_placeholder: 'Paste or type the order message',
     btn_parse: 'Parse',
+    btn_read_message: 'Read message',
+    reading_message: 'Reading message...',
+    capture_example_label: 'Example: bhaiya 5 peti biscuit chhota, 2 peti washing powder 1 kilo, chai patti 250 wala 1 peti',
+    capture_try_example: 'Try this example',
+    capture_empty_short: 'Paste a message and click Read message.',
+    col_original_words: 'Original words',
+    col_unit: 'Unit',
+    col_alternatives: 'Alternatives',
+    not_found: 'Not found',
+    out_of_stock: 'Out of stock',
+    cases_or_pieces: 'Cases or pieces?',
+    unit_case: 'Case',
+    unit_piece: 'Piece',
+    confidence_high: 'High',
+    confidence_medium: 'Medium',
+    confidence_low: 'Low',
+    select_alternative: 'Select alternative',
+    preview_payable: 'Preview payable',
+    lines_excluded: '{count} line excluded',
+    lines_excluded_plural: '{count} lines excluded',
+    btn_discard: 'Discard',
     btn_confirm_order: 'Confirm order',
     col_confidence: 'Confidence',
-    capture_empty: 'Enter an order message and click Parse to review lines',
+    capture_empty: 'Paste a message and click Read message.',
     parsing: 'Parsing...',
     confirming: 'Confirming...',
     title_export: 'Tally Export',
@@ -191,8 +239,10 @@ export const deskTranslations: Record<DeskLanguage, DeskTranslations> = {
     col_retailer: 'किराना',
     col_total: 'कुल',
     col_status: 'स्थिति',
-    col_source: 'स्रोत',
+    col_source: 'दिनांक',
     col_age: 'समय',
+    col_date: 'दिनांक',
+    col_time: 'समय',
     source_app: 'ऐप',
     source_message: 'मैसेज',
     source_desk: 'डेस्क',
@@ -201,7 +251,7 @@ export const deskTranslations: Record<DeskLanguage, DeskTranslations> = {
     status_credit_hold: 'क्रेडिट होल्ड',
     status_approved: 'स्वीकृत',
     status_cancelled: 'रद्द',
-    keyboard_shortcuts: '↑↓ नेविगेट करें  ·  Enter खोलें  ·  A स्वीकृत करें  ·  O ओवरराइड',
+    keyboard_shortcuts: '↑↓ नेविगेट करें  ·  A स्वीकृत करें  ·  O ओवरराइड',
     pagination_summary: '{total} में से {from}–{to}',
     btn_previous: 'पिछला',
     btn_next: 'अगला',
@@ -243,13 +293,35 @@ export const deskTranslations: Record<DeskLanguage, DeskTranslations> = {
     btn_reload: 'पुनः लोड करें',
     approved_by_info: '{name} द्वारा स्वीकृत, {time}',
     override_reason_note: 'ओवरराइड नोट: {reason}',
-    title_capture: 'AI ऑर्डर कैप्चर',
-    select_retailer: 'किराना चुनें',
-    capture_input_placeholder: 'ऑर्डर संदेश दर्ज करें (उदा. 5 बिस्किट, 2 तेल...)',
+    title_capture: 'ऑर्डर कैप्चर करें',
+    retailer_label: 'रिटेलर',
+    select_retailer: 'रिटेलर चुनें',
+    capture_input_placeholder: 'ऑर्डर संदेश पेस्ट या टाइप करें',
     btn_parse: 'पार्स करें',
+    btn_read_message: 'संदेश पढ़ें',
+    reading_message: 'संदेश पढ़ा जा रहा है...',
+    capture_example_label: 'उदाहरण: bhaiya 5 peti biscuit chhota, 2 peti washing powder 1 kilo, chai patti 250 wala 1 peti',
+    capture_try_example: 'यह उदाहरण आज़माएं',
+    capture_empty_short: 'संदेश पेस्ट करें और संदेश पढ़ें पर क्लिक करें।',
+    col_original_words: 'मूल शब्द',
+    col_unit: 'इकाई',
+    col_alternatives: 'विकल्प',
+    not_found: 'नहीं मिला',
+    out_of_stock: 'आउट ऑफ स्टॉक',
+    cases_or_pieces: 'केस या पीस?',
+    unit_case: 'केस',
+    unit_piece: 'पीस',
+    confidence_high: 'उच्च',
+    confidence_medium: 'मध्यम',
+    confidence_low: 'कम',
+    select_alternative: 'विकल्प चुनें',
+    preview_payable: 'पूर्वावलोकन देय',
+    lines_excluded: '{count} पंक्ति छोड़ी गई',
+    lines_excluded_plural: '{count} पंक्तियां छोड़ी गईं',
+    btn_discard: 'रद्द करें',
     btn_confirm_order: 'ऑर्डर पुष्टि करें',
     col_confidence: 'सटीकता',
-    capture_empty: 'पंक्तियों की समीक्षा के लिए संदेश दर्ज करें और पार्स पर क्लिक करें',
+    capture_empty: 'संदेश पेस्ट करें और संदेश पढ़ें पर क्लिक करें।',
     parsing: 'पार्स कर रहे हैं...',
     confirming: 'पुष्टि कर रहे हैं...',
     title_export: 'टैली एक्सपोर्ट',

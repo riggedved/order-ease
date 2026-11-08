@@ -35,6 +35,31 @@ export function formatDateTime(isoString: string | null | undefined): string {
   return `${day} ${month} ${year}, ${hours}:${minutes} ${ampm}`;
 }
 
+export function formatDateOnly(isoString: string | null | undefined): string {
+  if (!isoString) return '';
+  const date = new Date(isoString);
+  if (isNaN(date.getTime())) return isoString;
+
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+export function formatTimeOnly(isoString: string | null | undefined): string {
+  if (!isoString) return '';
+  const date = new Date(isoString);
+  if (isNaN(date.getTime())) return isoString;
+
+  let hours = date.getHours();
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  const ampm = hours >= 12 ? 'pm' : 'am';
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+
+  return `${hours}:${minutes} ${ampm}`;
+}
+
 export function getDefaultDateRange(): { from_date: string; to_date: string } {
   const today = new Date();
   const prior = new Date();

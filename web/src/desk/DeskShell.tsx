@@ -440,9 +440,9 @@ export const DeskShell: React.FC<DeskShellProps> = ({
           <button
             type="button"
             onClick={onLogout}
-            className="h-10 flex items-center gap-2.5 text-[14px] text-ink-muted hover:text-ink transition-colors px-1"
+            className="h-10 flex items-center gap-2.5 text-[14px] text-error hover:text-red-700 hover:bg-red-50 rounded transition-colors px-1 font-medium"
           >
-            <LogoutIcon className="w-5 h-5 text-ink-muted" />
+            <LogoutIcon className="w-5 h-5 text-error" />
             <span>{t.logout}</span>
           </button>
         </div>
@@ -507,6 +507,7 @@ export const DeskShell: React.FC<DeskShellProps> = ({
           <CaptureView
             token={token}
             lang={lang}
+            catalogue={catalogue}
             onOrderCreated={(newId) => {
               loadOrders();
               setSelectedOrderId(newId);

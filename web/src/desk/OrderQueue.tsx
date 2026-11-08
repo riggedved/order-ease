@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { DeskLanguage } from './i18n';
 import { deskTranslations } from './i18n';
 import type { DeskOrderSummary, DeskOrdersCounts, OrderStatus } from './types';
-import { formatINR } from './formatters';
+import { formatINR, formatDateOnly, formatTimeOnly } from './formatters';
 import { SearchIcon } from './icons';
 
 export interface OrderQueueProps {
@@ -83,24 +83,6 @@ export const OrderQueue: React.FC<OrderQueueProps> = ({
     { id: 'credit_hold', label: t.tab_credit_hold, count: counts.credit_hold },
     { id: 'approved', label: t.tab_approved, count: counts.approved },
   ];
-
-  const getSourceLabel = (source: string) => {
-    switch (source) {
-      case 'retailer_app':
-      case 'app':
-        return t.source_app;
-      case 'retailer_capture':
-      case 'message':
-        return t.source_message;
-      case 'desk_capture':
-      case 'desk':
-        return t.source_desk;
-      case 'salesman':
-        return t.source_salesman;
-      default:
-        return source;
-    }
-  };
 
   const getStatusDisplay = (status: OrderStatus) => {
     switch (status) {
@@ -243,8 +225,8 @@ export const OrderQueue: React.FC<OrderQueueProps> = ({
                 <th className="px-3 font-medium bg-gray-50">{t.col_retailer}</th>
                 <th className="px-3 font-medium text-right bg-gray-50">{t.col_total}</th>
                 <th className="px-3 font-medium bg-gray-50">{t.col_status}</th>
-                <th className="px-3 font-medium bg-gray-50">{t.col_source}</th>
-                <th className="px-3 font-medium text-right bg-gray-50">{t.col_age}</th>
+                <th className="px-3 font-medium bg-gray-50">{t.col_date}</th>
+                <th className="px-3 font-medium text-right bg-gray-50">{t.col_time}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -281,14 +263,14 @@ export const OrderQueue: React.FC<OrderQueueProps> = ({
                       {getStatusDisplay(order.status)}
                     </td>
 
-                    {/* Source */}
-                    <td className="px-3 text-ink-muted text-[13px]">
-                      {getSourceLabel(order.source)}
+                    {/* Date */}
+                    <td className="px-3 text-ink-muted text-[13px] tabular-nums whitespace-nowrap">
+                      {formatDateOnly(order.created_at)}
                     </td>
 
-                    {/* Age */}
-                    <td className="px-3 text-right text-ink-muted text-[13px] tabular-nums">
-                      {order.age}
+                    {/* Time */}
+                    <td className="px-3 text-right text-ink-muted text-[13px] tabular-nums whitespace-nowrap">
+                      {formatTimeOnly(order.created_at)}
                     </td>
                   </tr>
                 );

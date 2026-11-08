@@ -151,16 +151,12 @@ export const OrderDetailPane: React.FC<OrderDetailPaneProps> = ({
   };
 
   const handleApproveNormal = async () => {
-    if (isCreditHold) {
-      if (!overrideReason.trim()) return;
-      await onApprove(true, overrideReason.trim());
-    } else {
-      await onApprove(false);
-    }
+    if (isCreditHold) return;
+    await onApprove(false);
   };
 
   const handleApproveWithOverride = async () => {
-    if (!overrideReason.trim()) return;
+    if (!isCreditHold || !overrideReason.trim()) return;
     await onApprove(true, overrideReason.trim());
   };
 
@@ -172,8 +168,21 @@ export const OrderDetailPane: React.FC<OrderDetailPaneProps> = ({
     : 0;
   const availableAmount = Number(cp.available_credit);
 
-  const canApproveNormal = isCreditHold ? overrideReason.trim().length > 0 : true;
-  const canApproveOverride = overrideReason.trim().length > 0;
+  // Totals calculations
+  const subtotal =
+    (order as any).subtotal !== undefined
+      ? Number((order as any).subtotal)
+      : (order.lines || []).reduce((acc, l) => acc + (Number(l.line_total) || 0), 0);
+  const total = Number(order.total) || subtotal;
+  const gst =
+    (order as any).gst !== undefined
+      ? Number((order as any).gst)
+      : Math.max(0, total - subtotal);
+
+  // Credit hold orders are ONLY eligible for override & approve; normal approve is disabled
+  const canApproveNormal = !isCreditHold;
+  // A normal pending order should not be eligible for override & approve; only credit hold can be overridden
+  const canApproveOverride = isCreditHold && overrideReason.trim().length > 0;
 
   return (
     <div className="w-[40%] flex-1 h-full min-h-0 flex flex-col bg-white overflow-hidden select-none">
@@ -226,8 +235,6 @@ export const OrderDetailPane: React.FC<OrderDetailPaneProps> = ({
                   const stock = catSku?.stock_cases ?? 0;
                   const needed = (Number(line.qty_cases) || 0) + (Number(line.free_cases) || 0);
                   const isShort = needed > stock;
-                  const isAliasLearned =
-                    Boolean(line.original_words) && line.sku_code !== line.initial_sku_code;
 
                   return (
                     <tr key={line.line_id || idx} className="h-10 py-1">
@@ -253,20 +260,6 @@ export const OrderDetailPane: React.FC<OrderDetailPaneProps> = ({
                               </option>
                             ))}
                           </select>
-                        )}
-
-                        {/* Original captured words in grey quotes */}
-                        {line.original_words && (
-                          <div className="text-[13px] text-ink-muted italic mt-0.5 truncate">
-                            "{line.original_words}"
-                          </div>
-                        )}
-
-                        {/* Alias learning notice */}
-                        {isAliasLearned && (
-                          <div className="text-[12px] text-primary font-medium mt-0.5 truncate">
-                            {t.saves_as_alias}
-                          </div>
                         )}
                       </td>
 
@@ -314,21 +307,17 @@ export const OrderDetailPane: React.FC<OrderDetailPaneProps> = ({
 
           {/* Totals Breakdown */}
           <div className="flex flex-col items-end gap-1 pb-2 border-b border-border text-[14px] shrink-0">
-            {(order as any).subtotal !== undefined && (
-              <div className="flex justify-between w-48 text-ink-muted">
-                <span>{t.subtotal}</span>
-                <span className="tabular-nums">{formatINR((order as any).subtotal)}</span>
-              </div>
-            )}
-            {(order as any).gst !== undefined && (
-              <div className="flex justify-between w-48 text-ink-muted">
-                <span>{t.gst}</span>
-                <span className="tabular-nums">{formatINR((order as any).gst)}</span>
-              </div>
-            )}
+            <div className="flex justify-between w-48 text-ink-muted">
+              <span>{t.subtotal}</span>
+              <span className="tabular-nums">{formatINR(subtotal)}</span>
+            </div>
+            <div className="flex justify-between w-48 text-ink-muted">
+              <span>{t.gst}</span>
+              <span className="tabular-nums">{formatINR(gst)}</span>
+            </div>
             <div className="flex justify-between w-48 font-bold text-ink pt-1 border-t border-border text-[16px]">
               <span>{t.total}</span>
-              <span className="tabular-nums">{formatINR(order.total)}</span>
+              <span className="tabular-nums">{formatINR(total)}</span>
             </div>
           </div>
 
@@ -350,9 +339,9 @@ export const OrderDetailPane: React.FC<OrderDetailPaneProps> = ({
                 <span className="text-ink-muted">{t.credit_this_order}</span>
                 <span className="font-medium text-ink tabular-nums">{formatINR(cp.current_order_total, false)}</span>
               </div>
-              <div className="flex justify-between font-semibold text-ink">
-                <span>{t.credit_projected}</span>
-                <span className="tabular-nums">{formatINR(cp.projected_outstanding, false)}</span>
+              <div className="flex justify-between">
+                <span className="text-ink-muted">{t.credit_projected}</span>
+                <span className="font-medium text-ink tabular-nums">{formatINR(cp.projected_outstanding, false)}</span>
               </div>
             </div>
 
@@ -424,8 +413,11 @@ export const OrderDetailPane: React.FC<OrderDetailPaneProps> = ({
               type="text"
               value={overrideReason}
               onChange={(e) => setOverrideReason(e.target.value)}
+              disabled={!isCreditHold}
               placeholder={t.override_placeholder}
-              className="h-9 px-3 text-[14px] border border-border rounded text-ink placeholder:text-ink-muted focus:outline-none focus:border-primary w-full"
+              className={`h-9 px-3 text-[14px] border border-border rounded text-ink placeholder:text-ink-muted focus:outline-none focus:border-primary w-full ${
+                !isCreditHold ? 'bg-gray-50 text-ink-muted cursor-not-allowed' : 'bg-white'
+              }`}
             />
 
             {/* Row of three buttons, 40px tall (h-10), sized evenly, no text wrap */}
@@ -447,10 +439,10 @@ export const OrderDetailPane: React.FC<OrderDetailPaneProps> = ({
                 type="button"
                 disabled={actionLoading || !canApproveNormal}
                 onClick={handleApproveNormal}
-                className={`flex-1 h-10 px-1 rounded text-[13px] font-medium transition-colors flex items-center justify-center text-center whitespace-nowrap truncate ${
+                className={`flex-1 h-10 px-1 rounded text-[13px] font-semibold transition-colors flex items-center justify-center text-center whitespace-nowrap truncate ${
                   actionLoading || !canApproveNormal
-                    ? 'border border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'border border-border text-ink hover:bg-gray-50'
+                    ? 'border border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed font-medium'
+                    : 'bg-[#0c831f] text-white hover:bg-[#0a6f1a]'
                 }`}
               >
                 {actionLoading ? t.approving : t.btn_approve}
@@ -462,7 +454,7 @@ export const OrderDetailPane: React.FC<OrderDetailPaneProps> = ({
                 onClick={handleApproveWithOverride}
                 className={`flex-1 h-10 px-1 rounded text-[13px] font-semibold transition-colors flex items-center justify-center text-center whitespace-nowrap truncate ${
                   actionLoading || !canApproveOverride
-                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    ? 'border border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed font-medium'
                     : 'bg-[#0c831f] text-white hover:bg-[#0a6f1a]'
                 }`}
               >

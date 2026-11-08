@@ -3,7 +3,7 @@ import type { DeskLanguage } from './i18n';
 import { deskTranslations } from './i18n';
 import type { DeskOrderSummary } from './types';
 import { fetchDeskOrders } from './api';
-import { formatINR, getDefaultDateRange } from './formatters';
+import { formatINR, formatDateOnly, formatTimeOnly, getDefaultDateRange } from './formatters';
 
 export interface ExportViewProps {
   token: string;
@@ -17,7 +17,6 @@ export const ExportView: React.FC<ExportViewProps> = ({ token, lang }) => {
   const [fromDate, setFromDate] = useState(defaultDates.current.from_date);
   const [toDate, setToDate] = useState(defaultDates.current.to_date);
   const [format, setFormat] = useState<'xml' | 'csv'>('xml');
-  const [includeExported, setIncludeExported] = useState(false);
 
   const [orders, setOrders] = useState<DeskOrderSummary[]>([]);
   const [loading, setLoading] = useState(false);
@@ -49,7 +48,7 @@ export const ExportView: React.FC<ExportViewProps> = ({ token, lang }) => {
   const handleDownload = async () => {
     const params = new URLSearchParams();
     params.append('format', format);
-    if (includeExported) params.append('include_exported', 'true');
+    params.append('include_exported', 'true');
     if (fromDate) params.append('from_date', fromDate);
     if (toDate) params.append('to_date', toDate);
 
@@ -82,63 +81,35 @@ export const ExportView: React.FC<ExportViewProps> = ({ token, lang }) => {
     <div className="w-full flex-1 h-full min-h-0 flex flex-col bg-white overflow-hidden select-none">
       {/* Fixed Header Toolbar (Zone 1) */}
       <div className="h-16 shrink-0 px-6 py-2 border-b border-border flex items-center justify-between bg-white gap-4">
-        <div className="flex items-center gap-4 flex-1 min-w-0">
-          <h2 className="text-[18px] font-bold text-ink shrink-0">{t.title_export}</h2>
+        <h2 className="text-[18px] font-bold text-ink shrink-0">{t.title_export}</h2>
 
-          {/* Date range filters */}
-          <div className="flex items-center gap-1.5 shrink-0">
-            <div className="flex items-center border border-border rounded bg-white h-9 px-2">
-              <span className="text-[13px] font-medium text-ink-muted mr-1.5 uppercase">
-                {t.from_date}
-              </span>
-              <input
-                type="date"
-                lang="en-IN"
-                value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
-                className="text-[14px] text-ink bg-transparent focus:outline-none"
-              />
-            </div>
-            <span className="text-ink-muted text-[13px]">→</span>
-            <div className="flex items-center border border-border rounded bg-white h-9 px-2">
-              <span className="text-[13px] font-medium text-ink-muted mr-1.5 uppercase">
-                {t.to_date}
-              </span>
-              <input
-                type="date"
-                lang="en-IN"
-                value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
-                className="text-[14px] text-ink bg-transparent focus:outline-none"
-              />
-            </div>
-          </div>
-
-          {/* Format selection */}
-          <div className="flex items-center border border-border rounded bg-white h-9 px-2 shrink-0">
-            <span className="text-[13px] font-medium text-ink-muted mr-1.5">
-              {t.export_format}:
+        {/* Date range filters shifted to the right */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center border border-border rounded bg-white h-9 px-2">
+            <span className="text-[13px] font-medium text-ink-muted mr-1.5 uppercase">
+              {t.from_date}
             </span>
-            <select
-              value={format}
-              onChange={(e) => setFormat(e.target.value as 'xml' | 'csv')}
-              className="text-[14px] text-ink bg-transparent focus:outline-none"
-            >
-              <option value="xml">Tally XML</option>
-              <option value="csv">CSV</option>
-            </select>
-          </div>
-
-          {/* Include exported checkbox */}
-          <label className="flex items-center gap-1.5 text-[13px] text-ink-muted cursor-pointer shrink-0">
             <input
-              type="checkbox"
-              checked={includeExported}
-              onChange={(e) => setIncludeExported(e.target.checked)}
-              className="rounded border-border text-primary focus:ring-0"
+              type="date"
+              lang="en-IN"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="text-[14px] text-ink bg-transparent focus:outline-none cursor-pointer"
             />
-            <span>{t.include_exported}</span>
-          </label>
+          </div>
+          <span className="text-ink-muted text-[13px]">→</span>
+          <div className="flex items-center border border-border rounded bg-white h-9 px-2">
+            <span className="text-[13px] font-medium text-ink-muted mr-1.5 uppercase">
+              {t.to_date}
+            </span>
+            <input
+              type="date"
+              lang="en-IN"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              className="text-[14px] text-ink bg-transparent focus:outline-none cursor-pointer"
+            />
+          </div>
         </div>
       </div>
 
@@ -172,8 +143,8 @@ export const ExportView: React.FC<ExportViewProps> = ({ token, lang }) => {
                 <th className="px-3 font-medium bg-gray-50">{t.order_number.replace('{id}', 'ID')}</th>
                 <th className="px-3 font-medium bg-gray-50">{t.col_retailer}</th>
                 <th className="px-3 font-medium text-right bg-gray-50">{t.col_total}</th>
-                <th className="px-3 font-medium bg-gray-50">{t.col_source}</th>
-                <th className="px-3 font-medium text-right bg-gray-50">{t.col_age}</th>
+                <th className="px-3 font-medium bg-gray-50">{t.col_date}</th>
+                <th className="px-3 font-medium text-right bg-gray-50">{t.col_time}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -184,9 +155,11 @@ export const ExportView: React.FC<ExportViewProps> = ({ token, lang }) => {
                   <td className="px-3 text-right font-semibold text-ink tabular-nums">
                     {formatINR(o.total)}
                   </td>
-                  <td className="px-3 text-ink-muted text-[13px]">{o.source}</td>
-                  <td className="px-3 text-right text-ink-muted text-[13px] tabular-nums">
-                    {o.age}
+                  <td className="px-3 text-ink-muted text-[13px] tabular-nums whitespace-nowrap">
+                    {formatDateOnly(o.created_at)}
+                  </td>
+                  <td className="px-3 text-right text-ink-muted text-[13px] tabular-nums whitespace-nowrap">
+                    {formatTimeOnly(o.created_at)}
                   </td>
                 </tr>
               ))}
@@ -202,18 +175,35 @@ export const ExportView: React.FC<ExportViewProps> = ({ token, lang }) => {
             {t.export_summary.replace('{count}', String(orders.length))}
           </span>
         </div>
-        <button
-          type="button"
-          onClick={handleDownload}
-          disabled={orders.length === 0}
-          className={`h-10 px-6 rounded text-[13px] font-medium transition-colors ${
-            orders.length === 0
-              ? 'bg-gray-100 text-ink-subtle cursor-not-allowed'
-              : 'bg-primary text-white hover:bg-[#0a6f1a]'
-          }`}
-        >
-          {t.btn_download}
-        </button>
+        <div className="flex items-center gap-3">
+          {/* Format selection */}
+          <div className="flex items-center border border-border rounded bg-white h-10 px-2.5 shrink-0">
+            <span className="text-[13px] font-medium text-ink-muted mr-1.5">
+              {t.export_format}:
+            </span>
+            <select
+              value={format}
+              onChange={(e) => setFormat(e.target.value as 'xml' | 'csv')}
+              className="text-[14px] text-ink bg-transparent focus:outline-none cursor-pointer"
+            >
+              <option value="xml">Tally XML</option>
+              <option value="csv">CSV</option>
+            </select>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleDownload}
+            disabled={orders.length === 0}
+            className={`h-10 px-6 rounded text-[13px] font-semibold transition-colors ${
+              orders.length === 0
+                ? 'bg-gray-100 text-ink-subtle cursor-not-allowed font-medium'
+                : 'bg-primary text-white hover:bg-[#0a6f1a]'
+            }`}
+          >
+            {t.btn_download}
+          </button>
+        </div>
       </div>
     </div>
   );
