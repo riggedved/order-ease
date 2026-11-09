@@ -66,7 +66,7 @@ Order Ease replaces fragmented WhatsApp order taking with a dual-interface platf
 
 ### Prerequisites
 - **Python**: 3.14 (tested on 3.14.3, pinned via `.python-version`)
-- **Node.js**: 18.0+ (tested on Node 24 and npm 11)
+- **Node.js**: ^20.19.0 or >=22.12.0 (tested on Node 24 and npm 11)
 
 ### 1. Backend Setup
 From the repository root:
@@ -122,8 +122,9 @@ All accounts use the mock OTP: **`123456`**.
 | **`9826011111`** | `retailer` | Ramesh Gupta<br>*(Gupta Kirana Store)* | Standard retailer with ₹75,000 available credit. Review mobile catalogue, scheme tags, live cart quote, Hinglish text capture, and order placement. |
 | **`9826022222`** | `retailer` | Suresh Sharma<br>*(Sharma Provision Store)* | **Credit Hold Demo (Near-Limit)**: Only ₹3,500 available credit. Placing an order over ₹3,500 automatically flags order as `credit_hold`. |
 | **`9826000001`** | `order_desk` | Desk Officer<br>*(Company A Order Desk)* | **Order Desk Console**: Split queue (All, Pending, Credit Hold, Approved), live line editing, credit position 2x2 grid, approval, override approval, and Tally export. |
-| **`9826000002`** | `salesman` | Rahul Verma | Data-model and RBAC authorization only (no screens). |
-| **`9826000003`** | `owner` | Rajesh Agarwal | Data-model and RBAC authorization only (no screens). |
+
+> [!NOTE]
+> The salesman and owner roles exist in the data model and API authorization and are covered by the test suite (test_auth_and_roles.py), but are not seeded in the demo database and have no screens. Logging in with other numbers returns 'Phone number not registered'.
 
 ---
 
@@ -151,7 +152,7 @@ The repository is configured for zero-friction cloud deployment:
   - Build Command: `pip install -r backend/requirements.txt`
   - Start Command: `uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT`
   - Health Check: `/health`
-  - Python Version: `3.12` pinned via `.python-version`
+  - Python Version: `3.14` (tested on 3.14.3, pinned via `.python-version`)
 - **Frontend (Vercel SPA)**:
   - Root Directory: `web`
   - Build Command: `npm run build`
