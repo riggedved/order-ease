@@ -53,7 +53,8 @@ export const ExportView: React.FC<ExportViewProps> = ({ token, lang }) => {
     if (toDate) params.append('to_date', toDate);
 
     try {
-      const res = await fetch(`/desk/export/tally?${params.toString()}`, {
+      const apiBase = import.meta.env.VITE_API_BASE_URL || '/api';
+      const res = await fetch(`${apiBase}/desk/export/tally?${params.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

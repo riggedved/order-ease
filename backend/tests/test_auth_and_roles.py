@@ -23,6 +23,18 @@ def login_as(client: TestClient, phone: str, otp: str = "123456") -> str:
 class TestAuthAndOTP:
     """Authentication and OTP verification tests."""
 
+    def test_jwt_secret_required_in_production(self, monkeypatch):
+        """In production mode (ENV=production), missing JWT_SECRET must raise RuntimeError."""
+        import os, importlib
+        monkeypatch.setenv("ENV", "production")
+        monkeypatch.delenv("JWT_SECRET", raising=False)
+        with pytest.raises(RuntimeError, match="JWT_SECRET environment variable must be set in production mode"):
+            import backend.app.auth
+            importlib.reload(backend.app.auth)
+        # Restore development
+        monkeypatch.setenv("ENV", "development")
+        importlib.reload(backend.app.auth)
+
     def test_wrong_otp_returns_401(self, client: TestClient):
         """wrong OTP -> 401."""
         response = client.post("/auth/otp", json={"phone": "9826011111", "otp": "999999"})

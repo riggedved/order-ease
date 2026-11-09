@@ -15,6 +15,15 @@ def login_as(client: TestClient, phone: str, otp: str = "123456") -> str:
     return response.json()["access_token"]
 
 
+class TestHealthEndpoint:
+    """Tests for GET /health"""
+
+    def test_health_check_returns_ok_without_auth(self, client: TestClient):
+        response = client.get("/health")
+        assert response.status_code == 200
+        assert response.json() == {"status": "ok"}
+
+
 class TestCatalogueEndpoint:
     """Tests for GET /catalogue?retailer_id="""
 

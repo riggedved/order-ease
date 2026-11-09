@@ -2,6 +2,7 @@
 
 import csv
 import io
+import os
 import xml.etree.ElementTree as ET
 from contextlib import asynccontextmanager
 from datetime import date, datetime, time, timezone
@@ -10,6 +11,7 @@ import json
 from typing import Any, List, Optional
 from pydantic import BaseModel
 from fastapi import FastAPI, Depends, HTTPException, Query, Response, status
+from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, select
 
 from backend.app.db import get_session, init_db
@@ -64,9 +66,8 @@ from backend.app.schemas import (
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize SQLite database and seed initial data only when running production
-    if get_session not in app.dependency_overrides:
-        init_db()
+    # Initialize SQLite database and seed initial data if not already seeded
+    init_db()
     yield
 
 
@@ -76,6 +77,28 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+# CORS Configuration: allow origins from env var ALLOWED_ORIGINS (comma-separated, default empty)
+allowed_origins_raw = os.getenv("ALLOWED_ORIGINS", "")
+allowed_origins = [o.strip() for o in allowed_origins_raw.split(",") if o.strip()]
+
+if allowed_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+
+# ---------------------------------------------------------
+# Health Check Endpoint
+# ---------------------------------------------------------
+@app.get("/health")
+def health_check():
+    """Health check endpoint for Render and deployment monitoring with no auth or database work."""
+    return {"status": "ok"}
 
 
 # ---------------------------------------------------------

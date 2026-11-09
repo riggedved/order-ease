@@ -1,5 +1,6 @@
 """Authentication and authorization utilities using JWT and role-based access control."""
 
+import os
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Union
 import jwt
@@ -10,7 +11,17 @@ from sqlmodel import Session, select
 from backend.app.db import get_session
 from backend.app.models import User, Retailer, Role
 
-SECRET_KEY = "company-a-jabalpur-secure-key-32bytes-secret-token"
+DEV_SECRET_KEY = "company-a-jabalpur-secure-key-32bytes-secret-token"
+ENV = os.getenv("ENV", "development").lower()
+JWT_SECRET = os.getenv("JWT_SECRET")
+
+if not JWT_SECRET:
+    if ENV == "production":
+        raise RuntimeError("JWT_SECRET environment variable must be set in production mode.")
+    SECRET_KEY = DEV_SECRET_KEY
+else:
+    SECRET_KEY = JWT_SECRET
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = 24
 MOCK_OTP = "123456"

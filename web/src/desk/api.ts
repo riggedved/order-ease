@@ -5,6 +5,8 @@ import type {
   OrderPatchPayload,
 } from './types';
 
+const DESK_API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
+
 export class DeskApiError extends Error {
   status: number;
   detail: any;
@@ -68,7 +70,7 @@ export async function fetchDeskOrders(
   if (params.limit !== undefined) query.append('limit', String(params.limit));
   if (params.offset !== undefined) query.append('offset', String(params.offset));
 
-  const url = `/desk/orders?${query.toString()}`;
+  const url = `${DESK_API_BASE}/desk/orders?${query.toString()}`;
   const res = await fetch(url, {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -87,7 +89,7 @@ export async function fetchDeskOrderDetail(
   token: string,
   orderId: number
 ): Promise<DeskOrderDetail> {
-  const res = await fetch(`/desk/orders/${orderId}`, {
+  const res = await fetch(`${DESK_API_BASE}/desk/orders/${orderId}`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -102,7 +104,7 @@ export async function fetchDeskOrderDetail(
 }
 
 export async function fetchDeskCatalogue(token: string): Promise<DeskCatalogueSKU[]> {
-  const res = await fetch('/desk/catalogue', {
+  const res = await fetch(`${DESK_API_BASE}/desk/catalogue`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -121,7 +123,7 @@ export async function patchDeskOrder(
   orderId: number,
   payload: OrderPatchPayload
 ): Promise<DeskOrderDetail> {
-  const res = await fetch(`/desk/orders/${orderId}`, {
+  const res = await fetch(`${DESK_API_BASE}/desk/orders/${orderId}`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
@@ -145,7 +147,7 @@ export interface SimpleRetailer {
 }
 
 export async function fetchDeskRetailers(token: string, q?: string): Promise<SimpleRetailer[]> {
-  const url = q ? `/retailers?q=${encodeURIComponent(q)}` : '/retailers';
+  const url = q ? `${DESK_API_BASE}/retailers?q=${encodeURIComponent(q)}` : `${DESK_API_BASE}/retailers`;
   const res = await fetch(url, {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -162,7 +164,7 @@ export async function captureDeskOrder(
   retailerId: number,
   text: string
 ): Promise<any> {
-  const res = await fetch('/capture', {
+  const res = await fetch(`${DESK_API_BASE}/capture`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -186,7 +188,7 @@ export async function postDeskOrder(
   retailerId: number,
   lines: Array<{ sku_code: string; qty_cases: number; original_words?: string | null }>
 ): Promise<any> {
-  const res = await fetch('/orders', {
+  const res = await fetch(`${DESK_API_BASE}/orders`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
