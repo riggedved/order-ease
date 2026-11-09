@@ -1,0 +1,9 @@
+# Runtime Notes - Backend
+
+- Python Version: 3.14 (tested on 3.14.3, pinned via .python-version)
+- Web Server: Uvicorn ASGI server
+- Start Command: uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT
+- Build Command: pip install -r backend/requirements.txt
+- Database: SQLite (orderease.db created and seeded automatically on first startup)
+- Health Check: GET /health returns {"status": "ok"}
+

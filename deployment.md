@@ -5,13 +5,32 @@ Core slice: catalogue, cart, scheme engine, text AI capture, order desk manageme
 
 ---
 
+## Live Application
+
+- **Frontend (Web App)**: [https://order-ease-vexy1.vercel.app](https://order-ease-vexy1.vercel.app)
+- **Backend (API)**: [https://order-ease-15f8.onrender.com](https://order-ease-15f8.onrender.com)
+  - **Interactive API Documentation (Swagger)**: [https://order-ease-15f8.onrender.com/docs](https://order-ease-15f8.onrender.com/docs)
+  - **Health Check**: [https://order-ease-15f8.onrender.com/health](https://order-ease-15f8.onrender.com/health)
+
+---
+
+## Live Demo Notes
+
+> [!IMPORTANT]
+> - **Free Instance Spin-Down**: The backend runs on a Render free web service. If the instance has been idle for more than 15 minutes, it spins down. The first request may take up to 50–60 seconds to wake up. If slow initially, please wait a minute and retry.
+> - **Ephemeral Database**: The database is temporary. SQLite (`orderease.db`) runs on ephemeral storage; orders reset whenever the server restarts, and seed demo data is automatically recreated on startup.
+> - **Vernacular Capture Privacy**: With `CAPTURE_PARSER=auto`, pasted message text is sent to the LLM provider (e.g. Groq) and falls back to the local deterministic rule parser on any failure; with `CAPTURE_PARSER=rule`, all parsing is local and nothing leaves the server.
+> - **Mock Tally Export**: The Tally XML and CSV export outputs conform to standard distributor schemas, but have not been validated against a real physical Tally instance.
+
+---
+
 ## 1. Run Locally (Step-by-Step)
 
 ### Prerequisites
 
 | Tool | Required Version | Tested Version | Notes |
 | :--- | :--- | :--- | :--- |
-| **Python** | 3.10+ | 3.14.3 | Required for FastAPI backend |
+| **Python** | 3.14 | 3.14.3 | Pinned via `.python-version` |
 | **Node.js** | 18.0+ | 24.18.1 | Required for Vite + React frontend |
 | **npm** | 9.0+ | 11.16.0 | Node package manager |
 | **Git** | Any modern version | 2.x | Version control |
@@ -44,7 +63,7 @@ Core slice: catalogue, cart, scheme engine, text AI capture, order desk manageme
    ```
    - API Server runs at: `http://127.0.0.1:8000`
    - Interactive OpenAPI documentation: `http://127.0.0.1:8000/docs`
-   - ReDoc documentation: `http://127.0.0.1:8000/redoc`
+   - Health check: `http://127.0.0.1:8000/health`
 
 5. **Install frontend dependencies & start web app** (in a separate terminal):
    ```powershell
@@ -53,7 +72,7 @@ Core slice: catalogue, cart, scheme engine, text AI capture, order desk manageme
    npm run dev
    ```
    - Web application runs at: `http://localhost:3000`
-   - Vite automatically proxies `/auth`, `/me`, `/catalogue`, `/cart`, `/orders`, `/capture`, `/desk`, and `/retailers` to `http://127.0.0.1:8000`.
+   - Vite automatically proxies `/api/*` to `http://127.0.0.1:8000`.
 
 ---
 
@@ -106,6 +125,7 @@ All 102 tests run against an isolated SQLite test database and verify:
 - Role-based authorization (retailer, salesman, order_desk, owner)
 - Vernacular order capture (rule-based, LLM fallback, Devanagari numerals, category guards, alias learning)
 - Tally XML and CSV export formatting
+- Health endpoint and production secret enforcement
 
 ---
 
@@ -130,26 +150,40 @@ Upon the next API startup (or first request), `init_db()` automatically:
 
 ---
 
-## 2. Deployment Architecture (Render & Vercel)
+## 2. How It Is Deployed
 
-The application is architected to deploy seamlessly across **Render** (FastAPI backend) and **Vercel** (React/Vite frontend).
+The live system is deployed across **Vercel** (frontend SPA) and **Render** (backend API).
 
-### Live URLs (Placeholders)
-- **Frontend (Vercel)**: `https://YOUR-APP.vercel.app`
-- **Backend API (Render)**: `https://YOUR-SERVICE.onrender.com`
-- **Backend Health Check**: `https://YOUR-SERVICE.onrender.com/health`
+### Real Setup
 
----
+1. **Frontend (Vercel)**:
+   - **Repository Root**: `https://github.com/riggedved/order-ease.git`
+   - **Root Directory**: `web`
+   - **Framework Preset**: `Vite`
+   - **Build Command**: `npm run build`
+   - **Output Directory**: `dist`
+   - **Install Command**: `npm install`
+   - **Single-Origin Gateway (`web/vercel.json`)**:
+     Vercel rewrites all `/api/*` traffic directly to Render, allowing the frontend to make same-origin requests without cross-origin configuration:
+     ```json
+     {
+       "rewrites": [
+         {
+           "source": "/api/:path*",
+           "destination": "https://order-ease-15f8.onrender.com/:path*"
+         },
+         {
+           "source": "/(.*)",
+           "destination": "/index.html"
+         }
+       ]
+     }
+     ```
 
-### Backend Deployment (Render)
-
-Deploy as a **Web Service** on Render:
-
-1. **Connect Repository**: Point Render to the GitHub repository `https://github.com/riggedved/order-ease.git`.
-2. **Service Configuration**:
-   - **Environment**: `Python`
-   - **Python Version**: `3.12` (pinned via `.python-version` and `backend/runtime-notes`)
-   - **Root Directory**: `.` (leave default)
+2. **Backend (Render)**:
+   - **Service Type**: Free Web Service
+   - **Environment**: Python 3.14 (tested on 3.14.3, pinned via `.python-version`)
+   - **Root Directory**: `.`
    - **Build Command**:
      ```bash
      pip install -r backend/requirements.txt
@@ -159,64 +193,31 @@ Deploy as a **Web Service** on Render:
      uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT
      ```
    - **Health Check Path**: `/health` (returns `{"status": "ok"}`)
-3. **Environment Variables on Render**:
-   - `ENV`: `production`
-   - `JWT_SECRET`: Strong 32+ character random secret string (mandatory when `ENV=production`; the app will refuse to start if missing).
-   - `ALLOWED_ORIGINS`: `https://YOUR-APP.vercel.app` (optional fallback for direct browser CORS).
-   - `CAPTURE_PARSER`: `rule` (default, requires no key) or `auto` / `llm`.
-   - `LLM_API_KEY`: Groq / OpenAI API key (optional; only needed for `auto` or `llm` mode).
-   - `PYTHON_VERSION`: `3.12.8`
-
-> [!WARNING]
-> **Free Tier Sleep & Ephemeral Storage Warning**:
-> - **Spin-down / Cold Start**: On Render's free tier, the backend web service spins down after 15 minutes of inactivity. Waking it up on the first request can take up to 50–60 seconds.
-> - **Database Resets on Restart**: Because SQLite (`orderease.db`) resides on ephemeral disk storage on the free tier, the database file resets and is automatically re-seeded on instance restart. For persistent storage in production, connect a managed PostgreSQL instance by configuring `DATABASE_URL`.
 
 ---
 
-### Frontend Deployment (Vercel)
+### How This Would Scale
 
-Deploy as a static SPA on Vercel:
-
-1. **Connect Repository**: Import the `order-ease` repo into Vercel.
-2. **Project Settings**:
-   - **Framework Preset**: `Vite`
-   - **Root Directory**: `web`
-   - **Build Command**: `npm run build`
-   - **Output Directory**: `dist`
-   - **Install Command**: `npm install`
-3. **API Routing & Proxying (`web/vercel.json`)**:
-   `web/vercel.json` contains reverse-proxy rewrites so the frontend calls `/api/*` on the same origin, avoiding CORS issues entirely:
-   ```json
-   {
-     "rewrites": [
-       {
-         "source": "/api/:path*",
-         "destination": "https://YOUR-SERVICE.onrender.com/:path*"
-       },
-       {
-         "source": "/(.*)",
-         "destination": "/index.html"
-       }
-     ]
-   }
-   ```
-   *(Replace `https://YOUR-SERVICE.onrender.com` with your actual Render service URL).*
+For a high-volume production deployment:
+1. **Containerized Services**: Package the FastAPI backend as a Docker container deployed to AWS ECS (Fargate) or GCP Cloud Run with auto-scaling instances.
+2. **Persistent Database**: Migrate from SQLite to managed PostgreSQL (e.g. AWS RDS / Supabase) by configuring the `DATABASE_URL` environment variable.
+3. **Edge Asset Delivery**: Maintain frontend assets on AWS S3 with CloudFront CDN or Vercel Edge Network.
+4. **Queue Workers & Caching**: Offload heavy LLM parsing and Tally report generation to background Celery/Redis workers.
 
 ---
 
 ## 3. Environment Variables
 
-Configure environment variables in `.env` (local) or through your hosting provider's dashboard:
+The table below lists the active environment variables and where each is configured:
 
-| NAME | Purpose | Required / Optional | Example Placeholder |
-| :--- | :--- | :--- | :--- |
-| `ENV` | Environment identifier (`production` or `development`). When set to `production`, `JWT_SECRET` is strictly enforced. | Optional (Default: `development`) | `production` |
-| `JWT_SECRET` | Secret key used for signing and verifying HS256 JWT access tokens. Must be provided in production; defaults to development key when `ENV != production`. | **Required in production** | `sec_prod_9f82ab73c4d5e6f1a2b3c4d5e6f7a8b9` |
-| `ALLOWED_ORIGINS` | Comma-separated list of allowed CORS origins for direct browser API calls. | Optional (Default: empty / same-origin) | `https://YOUR-APP.vercel.app` |
-| `CAPTURE_PARSER` | Parser selection for vernacular order capture: `rule` (rule-based, zero API keys), `llm` (LLM-only), or `auto` (LLM with automatic fallback to rule). | Optional (Default: `rule`) | `rule` |
-| `LLM_API_KEY` | API key for OpenAI-compatible LLM endpoint (e.g. Groq, OpenAI). Only needed when `CAPTURE_PARSER=llm` or `auto`. | Optional | `gsk_placeholder_api_key_here` |
-| `DATABASE_URL` | SQLAlchemy connection string. Defaults to SQLite at repo root. | Optional (Default: `sqlite:///./orderease.db`) | `sqlite:///./orderease.db` |
+| Variable | Where It Is Set | Purpose & Details |
+| :--- | :--- | :--- |
+| **`ENV`** | Render Dashboard / Local `.env` | Environment identifier (`production` or `development`). When set to `production`, `JWT_SECRET` must be set or startup fails. |
+| **`JWT_SECRET`** | Render Dashboard / Local `.env` | Secret key used for signing and verifying HS256 JWT access tokens. Mandatory in production mode. |
+| **`CAPTURE_PARSER`** | Render Dashboard / Local `.env` | Parser selection for order capture: `rule` (deterministic rule-based, no API key), `llm` (LLM-only), or `auto` (LLM with rule fallback). |
+| **`LLM_API_KEY`** | Render Dashboard / Local `.env` | API key for OpenAI-compatible endpoint (e.g. Groq / OpenAI). Used when `CAPTURE_PARSER=auto` or `llm`. |
+| **`ALLOWED_ORIGINS`** | Local `.env` (Optional fallback) | Comma-separated list of allowed CORS origins for direct browser API calls. In production, Vercel rewrites handle requests as same-origin. |
+| **`DATABASE_URL`** | Local `.env` (Optional override) | SQLAlchemy connection string (`backend/app/db.py`). Defaults to `sqlite:///./orderease.db`. |
 
 ---
 
@@ -236,9 +237,11 @@ All demo accounts use the standard mock OTP: **`123456`**.
 
 ## 5. Six-Step End-to-End Demo Script
 
+This script can be executed directly on the live deployment ([https://order-ease-vexy1.vercel.app](https://order-ease-vexy1.vercel.app)) or locally (`http://localhost:3000`).
+
 ### Step 1: Retailer logs in and views catalogue & schemes
-1. Open `http://localhost:3000`.
-2. Log in with phone `9826011111` and OTP `123456`.
+1. Open [https://order-ease-vexy1.vercel.app](https://order-ease-vexy1.vercel.app).
+2. Log in with phone **`9826011111`** and OTP **`123456`**.
 3. View the catalogue:
    - Notice scheme tags: *"Buy 10 get 1 free"* on **Glucose biscuit 75 g**, *"3% off on 5+ cases"* on **Detergent powder 1 kg**.
    - Notice stock tags: **Tea leaf 250 g** shows *"Out of stock"*.
@@ -268,8 +271,8 @@ All demo accounts use the standard mock OTP: **`123456`**.
 4. Order is confirmed with status `pending`. Retailer outstanding balance updates immediately on profile.
 
 ### Step 5: Desk reviews, corrects a line (alias learned), and approves
-1. Switch to Order Desk: Log out or open an incognito window at `http://localhost:3000`.
-2. Log in with phone `9826000001` and OTP `123456`.
+1. Switch to Order Desk: Log out or open an incognito window at [https://order-ease-vexy1.vercel.app](https://order-ease-vexy1.vercel.app).
+2. Log in with phone **`9826000001`** and OTP **`123456`**.
 3. Select the new pending order in the **Orders** queue.
 4. Review the Order Detail pane:
    - Check the **Credit Position** (2x2 grid showing Credit limit, Outstanding, This order, Projected).
@@ -299,4 +302,3 @@ All demo accounts use the standard mock OTP: **`123456`**.
 3. **Salesman Offline Mode**: Dedicated salesman field screens and offline SQLite sync are not built (salesman role is implemented at the data-model and API authorization level).
 4. **Owner Dashboard**: Dedicated executive analytics screens are not built (owner role is implemented at the data-model and API authorization level).
 5. **Mocked OTP**: Phone authentication uses a fixed development OTP (`123456`) without live SMS gateway delivery.
-

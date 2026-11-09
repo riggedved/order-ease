@@ -28,7 +28,7 @@ Order Ease replaces fragmented WhatsApp order taking with a dual-interface platf
                 (backend/app/schemes.py) (backend/app/capture.py)     (orderease.db)
 ```
 
-- **Backend**: Python 3.12, FastAPI, SQLModel, SQLite (development / ephemeral) / PostgreSQL (production), PyJWT, Uvicorn.
+- **Backend**: Python 3.14 (tested on 3.14.3), FastAPI, SQLModel, SQLite (development / ephemeral) / PostgreSQL (production), PyJWT, Uvicorn.
 - **Frontend**: React 19, TypeScript, Tailwind CSS, Vite. Zero heavy UI component libraries — custom high-performance type system and design tokens.
 - **Bundle Size**: Main application bundle is **~89 kB gzipped**, Desk management chunk is **~14 kB gzipped** (well below the 150 kB budget).
 - **Test Suite**: 102 automated unit and integration tests with 100% passing status.
@@ -65,7 +65,7 @@ Order Ease replaces fragmented WhatsApp order taking with a dual-interface platf
 ## Quick Start (Local Development)
 
 ### Prerequisites
-- **Python**: 3.10+ (tested on Python 3.12 and 3.14)
+- **Python**: 3.14 (tested on 3.14.3, pinned via `.python-version`)
 - **Node.js**: 18.0+ (tested on Node 24 and npm 11)
 
 ### 1. Backend Setup
