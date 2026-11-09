@@ -20,7 +20,7 @@ Core slice: catalogue, cart, scheme engine, text AI capture, order desk manageme
 > - **Free Instance Spin-Down**: The backend runs on a Render free web service. If the instance has been idle for more than 15 minutes, it spins down. The first request may take up to 50–60 seconds to wake up. If slow initially, please wait a minute and retry.
 > - **Ephemeral Database**: The database is temporary. SQLite (`orderease.db`) runs on ephemeral storage; orders reset whenever the server restarts, and seed demo data is automatically recreated on startup.
 > - **Vernacular Capture Privacy**: With `CAPTURE_PARSER=auto`, pasted message text is sent to the LLM provider (e.g. Groq) and falls back to the local deterministic rule parser on any failure; with `CAPTURE_PARSER=rule`, all parsing is local and nothing leaves the server.
-> - **Mock Tally Export**: The Tally XML and CSV export outputs conform to standard distributor schemas, but have not been validated against a real physical Tally instance.
+> - **Mock Tally Export**: The structure follows Tally's XML import format but has not been validated against a real Tally installation.
 
 ---
 
@@ -31,7 +31,7 @@ Core slice: catalogue, cart, scheme engine, text AI capture, order desk manageme
 | Tool | Required Version | Tested Version | Notes |
 | :--- | :--- | :--- | :--- |
 | **Python** | 3.14 | 3.14.3 | Pinned via `.python-version` |
-| **Node.js** | 18.0+ | 24.18.1 | Required for Vite + React frontend |
+| **Node.js** | ^20.19.0 or >=22.12.0 | 24.18.1 | Required by Vite (engines in `web/node_modules/vite/package.json`) |
 | **npm** | 9.0+ | 11.16.0 | Node package manager |
 | **Git** | Any modern version | 2.x | Version control |
 
@@ -45,19 +45,25 @@ Core slice: catalogue, cart, scheme engine, text AI capture, order desk manageme
    cd order-ease
    ```
 
-2. **Create and activate the Python virtual environment**:
+2. **(Optional) Configure environment variables**:
+   ```powershell
+   Copy-Item .env.example .env
+   ```
+   *(Optional: the application runs out of the box without a `.env` file, defaulting to `rule` parser mode with zero API keys required).*
+
+3. **Create and activate the Python virtual environment**:
    ```powershell
    python -m venv .venv
    .\.venv\Scripts\Activate.ps1
    ```
    *(If script execution is restricted, run: `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`)*
 
-3. **Install backend dependencies**:
+4. **Install backend dependencies**:
    ```powershell
    pip install -r backend/requirements.txt
    ```
 
-4. **Start the backend API** (execute from repo root):
+5. **Start the backend API** (execute from repo root):
    ```powershell
    uvicorn backend.app.main:app --reload
    ```
@@ -65,7 +71,7 @@ Core slice: catalogue, cart, scheme engine, text AI capture, order desk manageme
    - Interactive OpenAPI documentation: `http://127.0.0.1:8000/docs`
    - Health check: `http://127.0.0.1:8000/health`
 
-5. **Install frontend dependencies & start web app** (in a separate terminal):
+6. **Install frontend dependencies & start web app** (in a separate terminal):
    ```powershell
    cd web
    npm install
@@ -84,25 +90,31 @@ Core slice: catalogue, cart, scheme engine, text AI capture, order desk manageme
    cd order-ease
    ```
 
-2. **Create and activate the Python virtual environment**:
+2. **(Optional) Configure environment variables**:
+   ```bash
+   cp .env.example .env
+   ```
+   *(Optional: the application runs out of the box without a `.env` file, defaulting to `rule` parser mode with zero API keys required).*
+
+3. **Create and activate the Python virtual environment**:
    ```bash
    python3 -m venv .venv
    source .venv/bin/activate
    ```
 
-3. **Install backend dependencies**:
+4. **Install backend dependencies**:
    ```bash
    pip install -r backend/requirements.txt
    ```
 
-4. **Start the backend API** (execute from repo root):
+5. **Start the backend API** (execute from repo root):
    ```bash
    uvicorn backend.app.main:app --reload
    ```
    - API Server runs at: `http://127.0.0.1:8000`
    - Interactive OpenAPI documentation: `http://127.0.0.1:8000/docs`
 
-5. **Install frontend dependencies & start web app** (in a separate terminal):
+6. **Install frontend dependencies & start web app** (in a separate terminal):
    ```bash
    cd web
    npm install
@@ -200,7 +212,7 @@ The live system is deployed across **Vercel** (frontend SPA) and **Render** (bac
 
 For a high-volume production deployment:
 1. **Containerized Services**: Package the FastAPI backend as a Docker container deployed to AWS ECS (Fargate) or GCP Cloud Run with auto-scaling instances.
-2. **Persistent Database**: Migrate from SQLite to managed PostgreSQL (e.g. AWS RDS / Supabase) by configuring the `DATABASE_URL` environment variable.
+2. **Persistent Database**: Set `DATABASE_URL` and re-run the test suite against PostgreSQL.
 3. **Edge Asset Delivery**: Maintain frontend assets on AWS S3 with CloudFront CDN or Vercel Edge Network.
 4. **Queue Workers & Caching**: Offload heavy LLM parsing and Tally report generation to background Celery/Redis workers.
 
@@ -230,8 +242,9 @@ All demo accounts use the standard mock OTP: **`123456`**.
 | **`9826011111`** | `retailer` | Ramesh Gupta<br>*(Gupta Kirana Store)* | **Primary Retailer Flow**: Credit limit ₹1,00,000 with ₹25,000 outstanding (₹75,000 available). Review mobile catalogue, scheme badges ("1 free / 10 cases", "3% off on 5+ cases"), live cart quote, Hinglish text capture, and standard order placement. |
 | **`9826022222`** | `retailer` | Suresh Sharma<br>*(Sharma Provision Store)* | **Credit Hold Demo (Near-Limit)**: Credit limit ₹80,000 with ₹76,500 outstanding (only ₹3,500 available credit). Profile indicates "Credit low". Placing an order exceeding ₹3,500 triggers `credit_hold` status instead of `pending`. |
 | **`9826000001`** | `order_desk` | Desk Officer<br>*(Company A Order Desk)* | **Order Desk Console**: High-density single-screen management UI. Review Queue tabs (All, Pending, Credit Hold, Approved), live search & date filtering, Order Detail pane, line editing with real-time re-quoting, credit position 2x2 grid, standard approval, override approval for credit holds, desk vernacular capture for any retailer, and Tally export. |
-| **`9826000002`** | `salesman` | Rahul Verma<br>*(Sales Representative)* | **Data-model only (No screens built)**: Assigned to specific retailers. Authorization enforced via API (`retailer.salesman_id == user.id`). Verified in test suite (`backend/tests/test_auth_and_roles.py`). |
-| **`9826000003`** | `owner` | Rajesh Agarwal<br>*(Distributor Owner)* | **Data-model only (No screens built)**: Full supervisor privileges over order desk, approval actions, and credit limit overrides. Verified in test suite (`backend/tests/test_auth_and_roles.py`). |
+
+> [!NOTE]
+> The salesman and owner roles exist in the data model and API authorization and are covered by the test suite (test_auth_and_roles.py), but are not seeded in the demo database and have no screens. Logging in with other numbers returns 'Phone number not registered'.
 
 ---
 
@@ -248,18 +261,18 @@ This script can be executed directly on the live deployment ([https://order-ease
 
 ### Step 2: Retailer captures order via Hinglish message
 1. Tap the **"Order by message"** tab or capture button.
-2. In the text box, paste the sample vernacular order:
+2. In the text box, paste the sample vernacular order (or tap the **"Try this example"** link under the box):
    ```text
    bhaiya 5 peti biscuit chhota, 2 peti washing powder 1 kilo, chai patti 250 wala 1 peti
    ```
-3. Tap **"Read message"** (or press `Ctrl+Enter`).
+3. Tap **"Read message"**.
 
 ### Step 3: Review parsed lines and add to cart
 1. Inspect the parsed lines:
-   - Line 1: `SKU-BS-075` (Glucose biscuit 75 g), 5 cases, High confidence.
+   - Line 1: `SKU-BS-075` (Glucose biscuit 75 g), 5 cases, Medium confidence ("Please check") with **Glucose biscuit 150 g** offered as an alternative candidate.
    - Line 2: `SKU-DT-1KG` (Detergent powder 1 kg), 2 cases, High confidence.
    - Line 3: `SKU-TE-250` (Tea leaf 250 g), 1 case, Out of stock (strikethrough line, excluded from totals).
-2. Note the preview payable: **₹7,948.00** before GST.
+2. Note the preview amounts: **subtotal ₹7,948.00**, **GST ₹925.20**, **total ₹8,873.20** including GST (1 line excluded).
 3. Tap **"Add to cart"**.
 
 ### Step 4: Review cart nudges and place order
@@ -283,7 +296,7 @@ This script can be executed directly on the live deployment ([https://order-ease
    - Warehouse stock is decremented.
 
 ### Step 6: Export approved orders to Tally
-1. Click the **"Export"** tab in the desk header.
+1. Click the **"Export"** tab in the left sidebar.
 2. Filter by date range (today's date).
 3. The approved order is listed.
 4. Select format: **Tally XML** (or CSV).
@@ -297,7 +310,7 @@ This script can be executed directly on the live deployment ([https://order-ease
 
 ## 6. Known Limits
 
-1. **Mock Tally Export**: The Tally XML and CSV export outputs conform to standard distributor schemas, but have not been validated against a live physical Tally ERP instance.
+1. **Mock Tally Export**: The structure follows Tally's XML import format but has not been validated against a real Tally installation.
 2. **Photo & Voice Capture**: Photo/camera capture (OCR) and voice note capture (audio speech-to-text) are not implemented; order capture operates on pasted or typed text messages.
 3. **Salesman Offline Mode**: Dedicated salesman field screens and offline SQLite sync are not built (salesman role is implemented at the data-model and API authorization level).
 4. **Owner Dashboard**: Dedicated executive analytics screens are not built (owner role is implemented at the data-model and API authorization level).
